@@ -36,7 +36,7 @@ Kificut is a multi-track editor built on Electron and FFmpeg. The preview is dra
 
 Installers for Windows and macOS are attached to each [release](https://github.com/Kificut-app/kificut/releases).
 
-Release builds are not code signed yet. On macOS, right click the app and choose Open the first time. On Windows, choose "More info" and then "Run anyway" if SmartScreen asks.
+Release builds are not code signed yet. On macOS, try to open the app once, then go to System Settings > Privacy & Security and choose Open Anyway. On Windows, choose "More info" and then "Run anyway" if SmartScreen asks.
 
 ## Building from source
 

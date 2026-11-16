@@ -7,6 +7,9 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   check:
     name: Lint, typecheck and test
@@ -31,18 +34,19 @@ jobs:
       matrix:
         include:
           - name: Windows x64
+            id: win-x64
             os: windows-latest
             args: --win --x64
-            arch: ''
           - name: macOS Apple Silicon
+            id: mac-arm64
             os: macos-latest
             args: --mac --arm64
-            arch: ''
+            expect: arm64
           - name: macOS Intel
+            id: mac-x64
             os: macos-latest
             args: --mac --x64
-            # Makes ffmpeg-static download the Intel binary on the Apple Silicon runner.
-            arch: x64
+            expect: x86_64
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
@@ -51,19 +55,76 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-        env:
-          npm_config_arch: ${{ matrix.arch }}
+      # The runner is Apple Silicon, so swap in the Intel FFmpeg binary for the Intel build.
+      # Only FFmpeg changes; the build tools must stay native to run here.
+      - name: Use the Intel FFmpeg binary
+        if: matrix.id == 'mac-x64'
+        run: |
+          rm -f node_modules/ffmpeg-static/ffmpeg
+          npm_config_arch=x64 node node_modules/ffmpeg-static/install.js
       - run: npm run build
-      - run: npx electron-builder ${{ matrix.args }} --publish never
+      - name: Package
+        shell: bash
         env:
-          # Set CSC_LINK / CSC_KEY_PASSWORD (and APPLE_ID etc. for notarization) as repository
-          # secrets to produce signed builds. Without them the installers are unsigned.
-          CSC_IDENTITY_AUTO_DISCOVERY: false
+          # Add CSC_LINK and CSC_KEY_PASSWORD as repository secrets for signed builds, plus
+          # APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD and APPLE_TEAM_ID to notarize on macOS.
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+        run: |
+          extra=()
+          if [ -z "$CSC_LINK" ]; then
+            unset CSC_LINK CSC_KEY_PASSWORD
+            export CSC_IDENTITY_AUTO_DISCOVERY=false
+            # Without a certificate, sign macOS builds ad hoc. Apple Silicon Macs refuse to open
+            # apps with no signature at all.
+            if [ "$RUNNER_OS" = "macOS" ]; then extra+=(--config.mac.identity=-); fi
+          fi
+          npx electron-builder ${{ matrix.args }} --publish never "${extra[@]}"
+      - name: Check the bundled FFmpeg
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            app=$(ls -d release/*/mac*/Kificut.app)
+            file "$app"/Contents/Resources/bin/*
+            file "$app"/Contents/Resources/bin/* | grep -q "${{ matrix.expect }}"
+            codesign --verify --deep --verbose=1 "$app"
+          else
+            ls -l release/*/win-unpacked/resources/bin
+            test -f release/*/win-unpacked/resources/bin/ffmpeg.exe
+            test -f release/*/win-unpacked/resources/bin/ffprobe.exe
+          fi
       - uses: actions/upload-artifact@v7
         with:
-          name: Kificut ${{ matrix.name }}
+          name: kificut-${{ matrix.id }}
           path: |
             release/*/*.exe
             release/*/*.dmg
             release/*/*.zip
           if-no-files-found: error
+
+  release:
+    name: Draft release
+    needs: package
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Create a draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          awk -v v="$version" '$0 ~ "^## \\[" v "\\]" {found=1; next} /^## \[/ {found=0} found' CHANGELOG.md > notes.md
+          cat >> notes.md <<'EOF'
+
+          ### Installing
+
+          These builds are not code signed yet. On macOS, try to open the app once, then go to System Settings > Privacy & Security and choose Open Anyway. On Windows, choose More info and then Run anyway if SmartScreen asks.
+          EOF
+          gh release create "$GITHUB_REF_NAME" dist/* --draft --verify-tag --title "Kificut $version" --notes-file notes.md
