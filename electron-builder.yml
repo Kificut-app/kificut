@@ -1,0 +1,77 @@
+appId: org.kificut.app
+productName: Kificut
+copyright: Copyright © 2026 Kificut contributors
+
+directories:
+  buildResources: build
+  output: release/${version}
+
+files:
+  - out/**/*
+  - package.json
+  - '!**/*.map'
+
+# FFmpeg runs as a separate process, so the binaries ship as plain resources outside the asar.
+extraResources:
+  - from: node_modules/ffmpeg-static
+    to: bin
+    filter:
+      - ffmpeg
+      - ffmpeg.exe
+  - from: node_modules/ffprobe-static/bin/${platform}/${arch}
+    to: bin
+    filter:
+      - ffprobe
+      - ffprobe.exe
+  - from: node_modules/ffmpeg-static
+    to: licenses
+    filter:
+      - ffmpeg.LICENSE
+  - from: LICENSE
+    to: licenses/LICENSE
+
+fileAssociations:
+  - ext: kificut
+    name: Kificut Project
+    description: Kificut video project
+    role: Editor
+    mimeType: application/x-kificut-project
+
+mac:
+  category: public.app-category.video
+  icon: build/icon.png
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
+  target:
+    - dmg
+    - zip
+  artifactName: ${productName}-${version}-mac-${arch}.${ext}
+
+dmg:
+  title: ${productName} ${version}
+
+win:
+  icon: build/icon.png
+  target:
+    - target: nsis
+      arch:
+        - x64
+  artifactName: ${productName}-${version}-win-${arch}.${ext}
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  shortcutName: Kificut
+
+linux:
+  icon: build/icon.png
+  category: AudioVideo
+  target:
+    - AppImage
+  artifactName: ${productName}-${version}-linux-${arch}.${ext}
+
+publish: null

@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.node.json",
+  "compilerOptions": {
+    "composite": false,
+    "noEmit": true
+  },
+  "include": [
+    "src/**/*.test.ts",
+    "src/shared/**/*.ts",
+    "src/renderer/src/lib/factory.ts",
+    "src/renderer/src/lib/timeline.ts"
+  ],
+  "exclude": []
+}
