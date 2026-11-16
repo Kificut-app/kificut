@@ -15,13 +15,7 @@ import { createClip, createProject } from '../renderer/src/lib/factory'
 
 const exe = process.platform === 'win32' ? '.exe' : ''
 const ffmpeg = join(__dirname, '../../node_modules/ffmpeg-static', `ffmpeg${exe}`)
-const ffprobe = join(
-  __dirname,
-  '../../node_modules/ffprobe-static/bin',
-  process.platform,
-  process.arch,
-  `ffprobe${exe}`
-)
+const ffprobe = join(__dirname, '../../vendor/ffprobe', `ffprobe${exe}`)
 const available = existsSync(ffmpeg) && existsSync(ffprobe)
 
 let dir = ''

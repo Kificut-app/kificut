@@ -55,13 +55,14 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      # The runner is Apple Silicon, so swap in the Intel FFmpeg binary for the Intel build.
-      # Only FFmpeg changes; the build tools must stay native to run here.
-      - name: Use the Intel FFmpeg binary
+      # The runner is Apple Silicon, so swap in Intel FFmpeg and FFprobe binaries for the Intel
+      # build. Only those two change; the build tools must stay native to run here.
+      - name: Use Intel FFmpeg binaries
         if: matrix.id == 'mac-x64'
         run: |
           rm -f node_modules/ffmpeg-static/ffmpeg
           npm_config_arch=x64 node node_modules/ffmpeg-static/install.js
+          npm_config_arch=x64 node scripts/fetch-ffprobe.mjs
       - run: npm run build
       - name: Package
         shell: bash
@@ -85,8 +86,12 @@ jobs:
         run: |
           if [ "$RUNNER_OS" = "macOS" ]; then
             app=$(ls -d release/*/mac*/Kificut.app)
-            file "$app"/Contents/Resources/bin/*
-            file "$app"/Contents/Resources/bin/* | grep -q "${{ matrix.expect }}"
+            for tool in ffmpeg ffprobe; do
+              info=$(file "$app/Contents/Resources/bin/$tool")
+              echo "$info"
+              # Every binary must match the build, not just one of them.
+              echo "$info" | grep -q "${{ matrix.expect }}" || { echo "::error::$tool has the wrong architecture"; exit 1; }
+            done
             codesign --verify --deep --verbose=1 "$app"
           else
             ls -l release/*/win-unpacked/resources/bin

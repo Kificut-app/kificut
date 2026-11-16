@@ -49,7 +49,7 @@ npm install
 npm run dev
 ```
 
-`npm install` downloads the FFmpeg and FFprobe binaries for your platform through `ffmpeg-static` and `ffprobe-static`.
+`npm install` downloads FFmpeg for your platform through `ffmpeg-static`, and `scripts/fetch-ffprobe.mjs` fetches the matching FFprobe from the same release into `vendor/`.
 
 | Command              | What it does                                         |
 | -------------------- | ---------------------------------------------------- |
@@ -114,4 +114,4 @@ Bug reports, ideas and pull requests are all welcome. [CONTRIBUTING.md](CONTRIBU
 
 Kificut is released under the [MIT license](LICENSE).
 
-The installers include FFmpeg and FFprobe builds from the `ffmpeg-static` and `ffprobe-static` projects. They run as separate programs and are distributed under their own license (GPL, since the builds include x264 and x265); a copy is included with the app and the source is available from [ffmpeg.org](https://ffmpeg.org). The Inter typeface is used under the SIL Open Font License.
+The installers include FFmpeg and FFprobe builds published by the `ffmpeg-static` project. They run as separate programs and are distributed under their own license (GPL, since the builds include x264 and x265); a copy is included with the app and the source is available from [ffmpeg.org](https://ffmpeg.org). The Inter typeface is used under the SIL Open Font License.

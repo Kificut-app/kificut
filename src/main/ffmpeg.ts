@@ -15,7 +15,7 @@ function bundledPath(name: 'ffmpeg' | 'ffprobe'): string {
   if (name === 'ffmpeg') {
     return join(root, 'node_modules', 'ffmpeg-static', name + exe)
   }
-  return join(root, 'node_modules', 'ffprobe-static', 'bin', process.platform, process.arch, name + exe)
+  return join(root, 'vendor', 'ffprobe', name + exe)
 }
 
 export function ffmpegPath(): string {
