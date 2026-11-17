@@ -1,10 +1,11 @@
 import { protocol } from 'electron'
 import { createReadStream } from 'node:fs'
 import { stat } from 'node:fs/promises'
-import { extname } from 'node:path'
+import { extname, resolve, sep } from 'node:path'
 import { Readable } from 'node:stream'
 
 export const MEDIA_SCHEME = 'media'
+export const MODELS_SCHEME = 'models'
 
 const MIME: Record<string, string> = {
   mp4: 'video/mp4',
@@ -26,16 +27,21 @@ const MIME: Record<string, string> = {
   webp: 'image/webp',
   gif: 'image/gif',
   bmp: 'image/bmp',
-  svg: 'image/svg+xml'
+  svg: 'image/svg+xml',
+  json: 'application/json',
+  js: 'text/javascript',
+  mjs: 'text/javascript',
+  txt: 'text/plain',
+  onnx: 'application/octet-stream',
+  bin: 'application/octet-stream'
 }
 
 /** Must run before the app is ready. */
 export function registerMediaScheme(): void {
+  const privileges = { standard: true, secure: true, supportFetchAPI: true, stream: true, corsEnabled: true }
   protocol.registerSchemesAsPrivileged([
-    {
-      scheme: MEDIA_SCHEME,
-      privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true, corsEnabled: true }
-    }
+    { scheme: MEDIA_SCHEME, privileges },
+    { scheme: MODELS_SCHEME, privileges }
   ])
 }
 
@@ -95,5 +101,38 @@ export function handleMediaProtocol(): void {
       typeof Response
     >[0]
     return new Response(body, { status: 200, headers: { ...headers, 'Content-Length': String(size) } })
+  })
+}
+
+/**
+ * Serves installed model files as models://store/<path>. Only files inside the models folder can
+ * be read.
+ */
+export function handleModelsProtocol(root: string): void {
+  const base = resolve(root)
+  protocol.handle(MODELS_SCHEME, async (request) => {
+    const url = new URL(request.url)
+    const relativePath = decodeURIComponent(url.pathname).replace(/^\/+/, '')
+    const path = resolve(base, relativePath)
+    if (path !== base && !path.startsWith(base + sep)) return new Response(null, { status: 403 })
+    let size: number
+    try {
+      const info = await stat(path)
+      if (!info.isFile()) return new Response(null, { status: 404 })
+      size = info.size
+    } catch {
+      return new Response(null, { status: 404 })
+    }
+    const body = Readable.toWeb(createReadStream(path)) as unknown as ConstructorParameters<
+      typeof Response
+    >[0]
+    return new Response(body, {
+      status: 200,
+      headers: {
+        'Content-Type': MIME[extname(path).slice(1).toLowerCase()] ?? 'application/octet-stream',
+        'Content-Length': String(size),
+        'Access-Control-Allow-Origin': '*'
+      }
+    })
   })
 }

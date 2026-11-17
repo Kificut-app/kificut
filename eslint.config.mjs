@@ -4,11 +4,27 @@ import reactHooks from 'eslint-plugin-react-hooks'
 import globals from 'globals'
 
 export default tseslint.config(
-  { ignores: ['out/**', 'release/**', 'dist/**', 'node_modules/**'] },
+  {
+    ignores: [
+      'out/**',
+      'release/**',
+      'dist/**',
+      'node_modules/**',
+      'vendor/**',
+      'connectors/*/build/**',
+      'connectors/*/dist/**'
+    ]
+  },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    files: ['src/main/**/*.ts', 'src/preload/**/*.ts', '*.config.{ts,mjs}', 'scripts/**/*.{js,mjs}'],
+    files: [
+      'src/main/**/*.ts',
+      'src/preload/**/*.ts',
+      'connectors/**/*.{ts,mts}',
+      '*.config.{ts,mjs}',
+      'scripts/**/*.{js,mjs}'
+    ],
     languageOptions: { globals: globals.node }
   },
   {

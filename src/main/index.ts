@@ -5,10 +5,33 @@ import { join } from 'node:path'
 import { IPC, type ExportRequest } from '@shared/ipc'
 import { PROJECT_EXTENSION, type AppSettings, type ProjectFile } from '@shared/types'
 import { getExportFormat } from '@shared/export-formats'
+import { MEDIA_EXTENSIONS } from '@shared/media-formats'
 import { buildMenu } from './menu'
 import { prepareForSave, readProject } from './project-file'
-import { handleMediaProtocol, registerMediaScheme } from './protocol'
-import { filmstrip, poster, probe, requestProxy, waveform } from './media'
+import { handleMediaProtocol, handleModelsProtocol, registerMediaScheme } from './protocol'
+import {
+  analyzeMedia,
+  decodeAudio,
+  filmstrip,
+  listMediaFiles,
+  poster,
+  probe,
+  requestProxy,
+  sampleFrames,
+  saveGenerated,
+  waveform
+} from './media'
+import { cancelModelInstall, installModel, listModelStatus, modelsDir, removeModel } from './models'
+import { registerAssistantIpc } from './assistant'
+import {
+  announceConnectorDisabled,
+  connectorStatus,
+  findClaudeBundle,
+  isConnectorRunning,
+  registerConnectorIpc,
+  startConnector,
+  stopConnector
+} from './connector'
 import { cancelExport, isExporting, startExport } from './export'
 import { resetVersionCache, toolInfo } from './ffmpeg'
 import {
@@ -22,46 +45,12 @@ import {
 const isDev = !app.isPackaged && !!process.env.ELECTRON_RENDERER_URL
 
 registerMediaScheme()
+// Lets the local AI models run on several CPU threads. Kificut only ever shows its own pages, so the
+// shared memory this turns on is not exposed to outside sites.
+app.commandLine.appendSwitch('enable-features', 'SharedArrayBuffer')
 
 const MEDIA_FILTERS = [
-  {
-    name: 'Media',
-    extensions: [
-      'mp4',
-      'mov',
-      'm4v',
-      'mkv',
-      'webm',
-      'avi',
-      'mts',
-      'm2ts',
-      'mxf',
-      'wmv',
-      'flv',
-      'mpg',
-      'mpeg',
-      'ts',
-      '3gp',
-      'mp3',
-      'wav',
-      'aac',
-      'm4a',
-      'flac',
-      'ogg',
-      'opus',
-      'aif',
-      'aiff',
-      'wma',
-      'png',
-      'jpg',
-      'jpeg',
-      'webp',
-      'bmp',
-      'gif',
-      'tif',
-      'tiff'
-    ]
-  },
+  { name: 'Media', extensions: MEDIA_EXTENSIONS },
   { name: 'All Files', extensions: ['*'] }
 ]
 
@@ -102,7 +91,9 @@ function createWindow(): BrowserWindow {
       nodeIntegration: false,
       spellcheck: false,
       autoplayPolicy: 'no-user-gesture-required',
-      additionalArguments: [`--app-version=${app.getVersion()}`]
+      // Keep rendering while Kificut sits behind another app, such as Claude Desktop driving it.
+      backgroundThrottling: false,
+      additionalArguments: [`--app-version=${app.getVersion()}`, `--home-dir=${app.getPath('home')}`]
     }
   })
 
@@ -180,6 +171,41 @@ function registerIpc(): void {
   ipcMain.handle(IPC.mediaWaveform, (_event, path: string) => waveform(path))
   ipcMain.handle(IPC.mediaExists, (_event, paths: string[]) => paths.map((p) => existsSync(p)))
   ipcMain.handle(IPC.mediaProxy, (_event, path: string) => requestProxy(path))
+  ipcMain.handle(IPC.mediaListFiles, (_event, folder: string, recursive: boolean) =>
+    listMediaFiles(folder, recursive)
+  )
+  ipcMain.handle(
+    IPC.mediaSampleFrames,
+    (_event, path: string, duration: number, count: number, start?: number, end?: number) =>
+      sampleFrames(path, duration, Math.max(1, Math.min(12, count)), start, end)
+  )
+  ipcMain.handle(
+    IPC.mediaAnalyze,
+    (_event, path: string, duration: number, hasVideo: boolean, hasAudio: boolean) =>
+      analyzeMedia(path, duration, hasVideo, hasAudio)
+  )
+
+  ipcMain.handle(IPC.mediaDecodeAudio, (_event, path: string, sampleRate: number) =>
+    decodeAudio(path, sampleRate)
+  )
+  ipcMain.handle(IPC.mediaSaveGenerated, (_event, name: string, data: Uint8Array) =>
+    saveGenerated(name, data)
+  )
+
+  ipcMain.handle(IPC.modelsList, () => listModelStatus())
+  ipcMain.handle(IPC.modelsInstall, (_event, id: string) => installModel(id))
+  ipcMain.handle(IPC.modelsCancel, (_event, id: string) => cancelModelInstall(id))
+  ipcMain.handle(IPC.modelsRemove, (_event, id: string) => removeModel(id))
+
+  registerAssistantIpc()
+
+  ipcMain.handle(IPC.aiStatus, () => connectorStatus(isConnectorRunning()))
+  ipcMain.handle(IPC.aiInstallClaude, async () => {
+    const bundle = findClaudeBundle()
+    if (!bundle) return { ok: false, error: 'This build does not include the Claude connector.' }
+    const error = await shell.openPath(bundle)
+    return error ? { ok: false, error } : { ok: true }
+  })
 
   ipcMain.handle(IPC.mediaLocate, async (event, name: string) => {
     const win = senderWindow(event)
@@ -276,6 +302,10 @@ function registerIpc(): void {
   ipcMain.handle(IPC.settingsSet, (_event, patch: Partial<AppSettings>) => {
     const next = updateSettings(patch)
     if ('ffmpegPath' in patch) resetVersionCache()
+    if ('connectorEnabled' in patch) {
+      if (next.connectorEnabled) void startConnector().catch(() => undefined)
+      else stopConnector()
+    }
     return next
   })
   ipcMain.handle(IPC.settingsTools, () => toolInfo())
@@ -326,14 +356,23 @@ if (!gotLock) {
     app.setName('Kificut')
     if (process.platform === 'win32') app.setAppUserModelId('org.kificut.app')
     handleMediaProtocol()
+    handleModelsProtocol(modelsDir())
     registerIpc()
+    registerConnectorIpc(() => BrowserWindow.getAllWindows()[0] ?? createWindow())
     buildMenu(isDev)
     createWindow()
+    if (getSettings().connectorEnabled) {
+      startConnector().catch((error: unknown) => console.error('Could not start the AI connector:', error))
+    } else {
+      announceConnectorDisabled()
+    }
 
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow()
     })
   })
+
+  app.on('will-quit', () => stopConnector(true))
 
   app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') app.quit()

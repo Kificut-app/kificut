@@ -1,0 +1,510 @@
+/* AI dialog */
+
+.ai-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.ai-dialog > .segmented {
+  align-self: flex-start;
+}
+
+.ai-dialog__section {
+  display: flex;
+  flex-direction: column;
+}
+
+.ai-dialog__fine {
+  margin-top: 12px;
+  color: var(--text-faint);
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+.ai-dialog__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 14px;
+}
+
+.ai-dialog__footer .link-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.model-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 12px;
+  align-items: start;
+  padding: 12px;
+  margin-bottom: 6px;
+  border-radius: var(--radius);
+  background: var(--bg-panel);
+}
+
+.model-row__icon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+}
+
+.model-row__title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.model-row__name {
+  font-weight: 600;
+}
+
+.model-row__meta {
+  color: var(--text-dim);
+  font-size: 11.5px;
+}
+
+.model-row__description {
+  margin-top: 3px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.model-row__progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 9px;
+  color: var(--text-dim);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.model-row__progress .progress {
+  flex: 1;
+}
+
+.model-row__error {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  color: var(--danger);
+  font-size: 12px;
+}
+
+.model-row__actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  align-self: center;
+}
+
+.model-row__ok {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--success);
+  font-size: 12px;
+  font-weight: 550;
+}
+
+.ai-key {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 300px;
+  justify-content: flex-end;
+}
+
+.ai-key .text-input {
+  flex: 1;
+}
+
+.ai-key__saved {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.ai-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  font-size: 12px;
+}
+
+.ai-check.is-ok {
+  color: var(--success);
+}
+
+.ai-check.is-error {
+  color: var(--danger);
+}
+
+/* Top bar task */
+
+.task-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 24px;
+  max-width: 340px;
+  margin-right: 6px;
+  padding: 0 10px;
+  border-radius: 12px;
+  background: var(--accent-soft);
+  color: var(--accent-hover);
+  font-size: 11.5px;
+  font-weight: 550;
+  white-space: nowrap;
+}
+
+.task-chip span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.spin {
+  flex: 0 0 auto;
+  animation: spin 0.9s linear infinite;
+}
+
+/* Right panel tabs */
+
+.panel__tab-dot {
+  position: absolute;
+  top: 9px;
+  right: 1px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: ai-pulse 0.9s ease-in-out infinite;
+}
+
+/* Assistant */
+
+.assistant {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.assistant--empty {
+  justify-content: center;
+  padding: 20px;
+}
+
+.assistant__intro {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.assistant__intro svg {
+  color: var(--accent);
+}
+
+.assistant__intro h3 {
+  color: var(--text);
+  font-size: 14px;
+}
+
+.assistant__intro p {
+  font-size: 12px;
+  line-height: 1.5;
+  max-width: 260px;
+}
+
+.assistant__bar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 8px 6px 12px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.assistant__model {
+  flex: 1;
+  min-width: 0;
+  color: var(--text-dim);
+  font-size: 11.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.assistant__messages {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+}
+
+.assistant__messages--ideas {
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.assistant__hint {
+  color: var(--text-dim);
+  font-size: 11.5px;
+  margin-bottom: 2px;
+}
+
+.assistant__idea {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  text-align: left;
+  transition:
+    background 0.12s,
+    color 0.12s;
+}
+
+.assistant__idea:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.chat {
+  max-width: 92%;
+  padding: 8px 11px;
+  border-radius: var(--radius-lg);
+  font-size: 12.5px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+.chat--user {
+  align-self: flex-end;
+  background: var(--accent-soft);
+  color: var(--text);
+  border-bottom-right-radius: var(--radius-xs);
+}
+
+.chat--assistant {
+  align-self: flex-start;
+  padding-left: 2px;
+  color: var(--text);
+}
+
+.chat-tool {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 100%;
+  padding: 5px 9px;
+  border-radius: var(--radius);
+  background: var(--bg-panel-raised);
+  color: var(--text-muted);
+  font-size: 11.5px;
+}
+
+.chat-tool.is-ok svg {
+  color: var(--success);
+}
+
+.chat-tool.is-error svg {
+  color: var(--danger);
+}
+
+.chat-tool__title {
+  flex: 0 0 auto;
+  font-weight: 550;
+}
+
+.chat-tool__summary {
+  min-width: 0;
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-notice {
+  align-self: center;
+  color: var(--text-dim);
+  font-size: 11.5px;
+  text-align: center;
+}
+
+.chat-notice.is-error {
+  color: #ffb4ae;
+}
+
+.chat-thinking {
+  display: flex;
+  gap: 4px;
+  padding: 6px 2px;
+}
+
+.chat-thinking span {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--text-dim);
+  animation: ai-pulse 1s ease-in-out infinite;
+}
+
+.chat-thinking span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.chat-thinking span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+.assistant__composer {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  margin: 0 10px 10px;
+  padding: 6px 6px 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-input);
+  transition: border-color 0.12s;
+}
+
+.assistant__composer:focus-within {
+  border-color: var(--accent-line);
+}
+
+.assistant__composer textarea {
+  flex: 1;
+  min-height: 22px;
+  max-height: 160px;
+  padding: 3px 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+  line-height: 1.45;
+  resize: none;
+  outline: none;
+  user-select: text;
+}
+
+.assistant__send {
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+}
+
+.assistant__send:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.assistant__send:disabled {
+  background: var(--bg-elevated);
+  color: var(--text-faint);
+}
+
+/* Voice */
+
+.voice {
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+}
+
+.voice .field-label:first-child {
+  margin-top: 0;
+}
+
+.voice .field-label {
+  margin: 12px 0 6px;
+  display: flex;
+  justify-content: space-between;
+}
+
+.voice__script {
+  min-height: 110px;
+  margin-bottom: 0;
+}
+
+.voice__value {
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.voice__generate {
+  margin-top: 16px;
+}
+
+.voice__note {
+  margin-top: 8px;
+  color: var(--text-faint);
+  font-size: 11px;
+  text-align: center;
+}
+
+.voice--setup {
+  align-items: center;
+  gap: 10px;
+  padding: 24px 18px;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.voice--setup h3 {
+  color: var(--text);
+  font-size: 13px;
+}
+
+.voice--setup p {
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.voice__progress {
+  width: 100%;
+}
+
+.voice__progress-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 6px;
+  color: var(--text-dim);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.voice__error {
+  color: var(--danger);
+  font-size: 11.5px;
+}
+
+.ai-dialog .setting__control > .select {
+  width: 230px;
+}

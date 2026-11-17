@@ -93,8 +93,10 @@ jobs:
               echo "$info" | grep -q "${{ matrix.expect }}" || { echo "::error::$tool has the wrong architecture"; exit 1; }
             done
             codesign --verify --deep --verbose=1 "$app"
+            test -f "$app"/Contents/Resources/connectors/*.mcpb
           else
             ls -l release/*/win-unpacked/resources/bin
+            test -f release/*/win-unpacked/resources/connectors/*.mcpb
             test -f release/*/win-unpacked/resources/bin/ffmpeg.exe
             test -f release/*/win-unpacked/resources/bin/ffprobe.exe
           fi
@@ -105,6 +107,7 @@ jobs:
             release/*/*.exe
             release/*/*.dmg
             release/*/*.zip
+            connectors/claude/dist/*.mcpb
           if-no-files-found: error
 
   release:
@@ -133,7 +136,7 @@ jobs:
           These builds are not code signed yet. On macOS, try to open the app once, then go to System Settings > Privacy & Security and choose Open Anyway. On Windows, choose More info and then Run anyway if SmartScreen asks.
           EOF
           # Artifacts keep their release/<version>/ folders, so collect the installer files themselves.
-          mapfile -t files < <(find dist -type f \( -name '*.exe' -o -name '*.dmg' -o -name '*.zip' \) | sort)
+          mapfile -t files < <(find dist -type f \( -name '*.exe' -o -name '*.dmg' -o -name '*.zip' -o -name '*.mcpb' \) | sort)
           printf '%s\n' "${files[@]}"
           if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
             # A re-run of this job attaches the files to the draft created earlier.

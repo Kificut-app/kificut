@@ -11,6 +11,7 @@ import './styles/inspector.css'
 import './styles/timeline.css'
 import './styles/dialogs.css'
 import './styles/welcome.css'
+import './styles/ai.css'
 import { App } from './App'
 
 document.documentElement.dataset.platform = window.kificut.platform

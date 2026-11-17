@@ -1,7 +1,7 @@
 {
   "name": "kificut",
   "productName": "Kificut",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A fast, open source video editor for Windows and macOS.",
   "license": "MIT",
   "author": "Kificut contributors",
@@ -20,7 +20,7 @@
   "scripts": {
     "postinstall": "node scripts/fetch-ffprobe.mjs",
     "dev": "electron-vite dev",
-    "build": "electron-vite build",
+    "build": "electron-vite build && npm run build:connector",
     "preview": "electron-vite preview",
     "start": "electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json && tsc -p tsconfig.test.json",
@@ -32,11 +32,16 @@
     "dist:win": "npm run build && electron-builder --win",
     "dist:mac": "npm run build && electron-builder --mac",
     "dist:linux": "npm run build && electron-builder --linux",
-    "brand:sound": "node scripts/brand-sound.mjs"
+    "brand:sound": "node scripts/brand-sound.mjs",
+    "build:connector": "node scripts/build-connector.mjs"
   },
   "devDependencies": {
+    "@anthropic-ai/mcpb": "^2.1.2",
+    "@anthropic-ai/sdk": "^1.9.0",
     "@eslint/js": "^10.0.1",
     "@fontsource-variable/inter": "^5.3.0",
+    "@huggingface/transformers": "^3.8.1",
+    "@modelcontextprotocol/sdk": "^1.32.2",
     "@types/node": "^24.0.0",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
@@ -49,6 +54,7 @@
     "ffmpeg-static": "^5.3.0",
     "globals": "^17.14.0",
     "immer": "^11.2.10",
+    "kokoro-js": "^1.2.1",
     "lucide-react": "^1.73.0",
     "prettier": "^3.10.1",
     "react": "^19.3.1",
@@ -57,6 +63,7 @@
     "typescript-eslint": "^8.73.0",
     "vite": "^8.3.8",
     "vitest": "^4.1.12",
+    "zod": "^4.6.7",
     "zustand": "^5.1.0"
   }
 }

@@ -31,6 +31,7 @@ const DRIFT_LIMIT = 0.2
  */
 class Player {
   private compositor: LayerRenderer | null = null
+  private canvas: HTMLCanvasElement | null = null
   private entries = new Map<string, MediaEntry>()
   private audio: AudioContext | null = null
   private master: GainNode | null = null
@@ -60,6 +61,7 @@ class Player {
   private createRenderer(canvas: HTMLCanvasElement): LayerRenderer | null {
     this.error = null
     try {
+      this.canvas = canvas
       return new Compositor(canvas)
     } catch (err) {
       console.info('WebGL 2 preview unavailable, using the 2D canvas renderer.', err)
@@ -72,6 +74,7 @@ class Player {
       canvas.replaceWith(target)
     }
     try {
+      this.canvas = target
       return new CanvasCompositor(target)
     } catch (err) {
       this.error = err instanceof Error ? err.message : String(err)
@@ -398,10 +401,50 @@ class Player {
     for (const id of [...this.entries.keys()]) if (!needed.has(id)) this.release(id)
   }
 
-  private render(project: Project, t: number, state: EditorState): void {
+  /**
+   * Renders the frame at the playhead once every visible video has seeked to it, and returns it as
+   * a base64 JPEG no wider than maxWidth. Used when an assistant asks to see the timeline.
+   */
+  async capture(maxWidth = 960): Promise<string> {
+    const project = useEditor.getState().project
+    if (!project || !this.compositor || !this.canvas) throw new Error('The preview is not available.')
+    const t = useEditor.getState().playhead
+    const deadline = performance.now() + 6000
+    while (performance.now() < deadline) {
+      this.sync(project, t, useEditor.getState())
+      if (this.settled(project, t)) break
+      await new Promise((resolve) => setTimeout(resolve, 30))
+    }
+    this.render(project, t, useEditor.getState(), Math.min(1, maxWidth / project.settings.width))
+    const copy = document.createElement('canvas')
+    copy.width = this.canvas.width
+    copy.height = this.canvas.height
+    copy.getContext('2d')!.drawImage(this.canvas, 0, 0)
+    this.dirty = true
+    return copy.toDataURL('image/jpeg', 0.86).split(',')[1]
+  }
+
+  private settled(project: Project, t: number): boolean {
+    const fps = project.settings.fps
+    for (const clip of project.clips) {
+      if (clip.kind !== 'video' && clip.kind !== 'image') continue
+      if (t < clip.start || t >= clip.start + clip.duration) continue
+      const track = project.tracks.find((tr) => tr.id === clip.trackId)
+      if (!track || track.hidden || (clip.mediaId && useEditor.getState().offline[clip.mediaId])) continue
+      const entry = this.entries.get(clip.id)
+      if (!entry || !entry.loaded) return false
+      if (entry.kind !== 'video') continue
+      const video = entry.el as HTMLVideoElement
+      if (video.readyState < 2 || video.seeking) return false
+      if (Math.abs(video.currentTime - sourceTime(clip, t)) > 1.5 / fps) return false
+    }
+    return true
+  }
+
+  private render(project: Project, t: number, state: EditorState, scaleOverride?: number): void {
     const compositor = this.compositor!
     const { width, height, background } = project.settings
-    const scale = clamp(state.previewScale, 0.25, 1)
+    const scale = scaleOverride ?? clamp(state.previewScale, 0.25, 1)
     compositor.resize(Math.round(width * scale), Math.round(height * scale), width, height)
     compositor.begin(background)
 

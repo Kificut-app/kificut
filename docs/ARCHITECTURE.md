@@ -68,6 +68,40 @@ Whether a file needs a preview copy is decided in `lib/media.ts` from the contai
 
 `src/shared/ffmpeg-graph.integration.test.ts` renders a project with every kind of layer through the real FFmpeg in each output format.
 
+## Assistant connector
+
+Assistants such as Claude edit through a fixed set of tools defined once in `src/shared/ai-tools.ts`. Each tool has a JSON Schema for its input and MCP hints such as `readOnlyHint`.
+
+```
+Claude Desktop -- stdio (MCP) --> connector (connectors/claude) -- TCP 127.0.0.1 --> Kificut main -- IPC --> renderer tools
+```
+
+- **Kificut** (`src/main/connector.ts`) listens on a random port on 127.0.0.1 and writes the port and a fresh 256 bit token to `connector.json` in its user data folder, readable only by the user. A client must send the token before anything else. Calls are forwarded to the renderer, which runs them one at a time in `src/renderer/src/ai/tools.ts` and replies with MCP content (text and JPEG images). Turning off **Let Claude edit in Kificut** stops the listener and marks the file as disabled.
+- **The connector** (`connectors/claude/src`) is an MCP server built on the official SDK. It lists the tools, reads `connector.json`, starts Kificut through the recorded launch command when it is closed, and relays calls. `scripts/build-connector.mjs` bundles it into one file with Vite, writes the manifest from the same tool list and packs it with `mcpb`. The bundle ships inside the app (for the Settings button) and with each release.
+- **Tools** reuse the editor's own actions, so every change is one undo step and shows up live. Edits that span several actions run inside a gesture. `view_frame` renders the composited frame through the player once all visible video has seeked, and `inspect_media` and `analyze_media` use FFmpeg in the main process (frame sampling, `select=gt(scene,0.3)` and `silencedetect`), cached per file.
+
+To add a tool, define it in `ai-tools.ts`, implement it in `ai/tools.ts` (a test checks both lists match), and rebuild the connector with `npm run build:connector`.
+
+## Local AI models
+
+Kokoro (text to speech) and Whisper (speech to text) run in a module worker in the renderer (`src/renderer/src/local-ai/worker.ts`) with transformers.js and ONNX Runtime Web.
+
+- **Install** (`src/main/models.ts`): the registry in `src/shared/models.ts` pins each model to a Hugging Face commit. The main process asks the Hub API for the file list at that revision, downloads with `net.fetch` through `src/main/download.ts` (which retries dropped connections and resumes with range requests), checks every file against its published SHA-256 (LFS files) or git blob SHA-1, writes through `.part` files and finishes with a marker file. Models live in `<userData>/models`, laid out by repository id.
+- **Loading**: the privileged `models://store/` scheme serves that folder to the renderer. transformers.js is pointed at it with remote models turned off, and the worker refuses any other network request, so inference never goes online.
+- **eSpeak NG**: kokoro-js imports `phonemizer`, which embeds the GPL licensed eSpeak NG. Vite aliases that import to `local-ai/phonemizer.ts`, which loads the copy downloaded with the model from `models://`. Nothing GPL is bundled.
+- **Threads**: Kificut turns on `SharedArrayBuffer` (it only ever shows its own pages) so ONNX Runtime can use several threads.
+- **Whisper language**: transformers.js does not detect the spoken language and falls back to English, so the worker scores Whisper's language tokens after the start token on the first 30 seconds and passes the winner on.
+- **Features** (`local-ai/features.ts`): voiceovers are encoded to WAV and saved through the main process; transcripts are cached per file, model and language; `captionsForClip` maps source time segments onto a clip with its trims and speed. The same functions back the Voice tab, the Generate Captions menu item and the `generate_voiceover`, `transcribe_media` and `add_captions` tools. Nothing is bundled with the app: `list_ai_models` and `install_ai_model` let an assistant install a model on request.
+
+## In-app assistant
+
+The Assistant tab runs a provider loop in the main process (`src/main/assistant`), so API keys never reach the renderer. Tool calls go to the renderer through the same `callTool` path as the connector.
+
+- `settings.ts` stores provider settings in `assistant.json`; keys are encrypted with `safeStorage`. On Linux without a keyring, keys are kept for the session only.
+- `anthropic.ts` uses the official SDK's tool runner with streaming, `eager_input_streaming` tools, a cached system prompt and `fallbacks: "default"` on models that take it. Tool errors go back as `is_error` results.
+- `openai.ts` speaks OpenAI style chat completions over SSE for OpenAI, Gemini, OpenRouter, Ollama, LM Studio and custom servers. Tool arguments split across chunks are joined, unreadable arguments are answered with an `INVALID_JSON` error instead of being run, and images from tools follow as a user message (retried without them for models that reject images).
+- Each session keeps its own history; stopping keeps the finished tool rounds so the next message continues from there. `providers.test.ts` runs both adapters against local mock servers.
+
 ## Adding a clip property
 
 1. Add the field to `Clip` in `src/shared/types.ts` and a default in `lib/factory.ts`.

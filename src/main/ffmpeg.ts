@@ -36,6 +36,7 @@ export interface RunResult {
 
 export interface RunOptions {
   onStdout?: (chunk: Buffer) => void
+  onStderr?: (chunk: Buffer) => void
   onSpawn?: (child: ChildProcess) => void
   collectStdout?: boolean
 }
@@ -51,6 +52,7 @@ export function run(binary: string, args: string[], options: RunOptions = {}): P
       options.onStdout?.(chunk)
     })
     child.stderr.on('data', (chunk: Buffer) => {
+      options.onStderr?.(chunk)
       err += chunk.toString()
       if (err.length > 64_000) err = err.slice(-32_000)
     })

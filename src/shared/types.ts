@@ -160,6 +160,8 @@ export interface AppSettings {
   previewScale: number
   showWaveforms: boolean
   showThumbnails: boolean
+  /** Lets AI assistants such as Claude edit through the local connector. */
+  connectorEnabled: boolean
 }
 
 export interface BinaryInfo {
@@ -183,6 +185,40 @@ export interface Waveform {
   peaks: Float32Array
   /** Peaks per second of source audio. */
   rate: number
+}
+
+export interface MediaFileEntry {
+  path: string
+  name: string
+  size: number
+  modified: string
+}
+
+export interface MediaFileList {
+  folder: string
+  files: MediaFileEntry[]
+  truncated: boolean
+}
+
+export interface SampledFrame {
+  /** Source time in seconds. */
+  time: number
+  /** Base64 JPEG. */
+  data: string
+}
+
+export interface MediaAnalysis {
+  /** Source times where the picture changes to a new shot. */
+  scenes: number[]
+  silences: Array<{ start: number; end: number }>
+}
+
+export interface AiStatus {
+  enabled: boolean
+  connected: boolean
+  client: string | null
+  /** The Claude Desktop bundle shipped with this build, if any. */
+  bundleAvailable: boolean
 }
 
 export interface ProxyStatus {

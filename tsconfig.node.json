@@ -23,7 +23,9 @@
     "vitest.config.mts",
     "src/main/**/*",
     "src/preload/**/*",
-    "src/shared/**/*"
+    "src/shared/**/*",
+    "connectors/claude/src/**/*",
+    "connectors/claude/vite.config.mts"
   ],
   "exclude": ["src/**/*.test.ts"]
 }

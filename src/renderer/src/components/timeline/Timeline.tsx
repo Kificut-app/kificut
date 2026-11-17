@@ -31,6 +31,7 @@ import {
   zoomBy
 } from '../../store/actions'
 import { openMenu } from '../../store/ui'
+import { generateCaptions } from '../../local-ai/commands'
 import { uid, defaultTransform } from '../../lib/factory'
 import {
   clipEnd,
@@ -448,6 +449,11 @@ export function Timeline() {
       clip.linkId
         ? { label: 'Unlink', run: unlinkSelection }
         : { label: 'Link', disabled: count < 2, run: linkSelection },
+      {
+        label: 'Generate Captions',
+        disabled: count !== 1 || !clip.mediaId || (clip.kind !== 'video' && clip.kind !== 'audio'),
+        run: () => void generateCaptions(clip.id)
+      },
       {
         label: 'Reset Transform',
         disabled: clip.kind === 'audio',

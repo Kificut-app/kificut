@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import { Download, Redo2, Settings, Undo2 } from 'lucide-react'
+import { Download, Loader2, Redo2, Settings, Sparkles, Undo2 } from 'lucide-react'
 import { isDirty, redo, setDialog, undo, useEditor } from '../store/editor'
 import { renameProject, saveProject } from '../store/actions'
-import { Button, IconButton } from './ui/controls'
+import { useUi } from '../store/ui'
+import { openAiDialog } from './dialogs/AiDialog'
+import { Button, IconButton, cx } from './ui/controls'
 import { LogoMark } from './Logo'
 import { modKey } from '../lib/platform'
 
@@ -37,6 +39,9 @@ export function TopBar() {
 
           <div className="topbar__spacer" />
 
+          <TaskChip />
+          <AiChip />
+
           <div className="topbar__actions">
             <IconButton tip={`Undo|${modKey}Z`} onClick={undo} disabled={!canUndo}>
               <Undo2 size={16} />
@@ -47,6 +52,9 @@ export function TopBar() {
               disabled={!canRedo}
             >
               <Redo2 size={16} />
+            </IconButton>
+            <IconButton tip="AI models and assistant" onClick={() => openAiDialog()}>
+              <Sparkles size={16} />
             </IconButton>
             <IconButton tip="Settings" onClick={() => setDialog('preferences')}>
               <Settings size={16} />
@@ -111,6 +119,43 @@ function ProjectTitle({ name }: { name: string }) {
       onClick={() => setEditing(true)}
     >
       {name}
+    </button>
+  )
+}
+
+function TaskChip() {
+  const tasks = useUi((s) => s.tasks)
+  if (tasks.length === 0) return null
+  const task = tasks[tasks.length - 1]
+  const more = tasks.length > 1 ? ` (+${tasks.length - 1})` : ''
+  return (
+    <div className="task-chip" role="status">
+      <Loader2 size={12} className="spin" />
+      <span>
+        {task.label}
+        {task.status ? `: ${task.status}` : ''}
+        {more}
+      </span>
+    </div>
+  )
+}
+
+function AiChip() {
+  const status = useUi((s) => s.ai.status)
+  const activity = useUi((s) => s.ai.activity)
+  if (!status?.connected) return null
+  const client = status.client ?? 'Assistant'
+  return (
+    <button
+      type="button"
+      className={cx('ai-chip', activity && 'is-busy')}
+      data-tip={
+        activity ? `${client} is working: ${activity}` : `${client} is connected and can edit this project`
+      }
+      onClick={() => setDialog('preferences')}
+    >
+      <span className="ai-chip__dot" />
+      <span>{activity ? `${client}: ${activity}` : client}</span>
     </button>
   )
 }

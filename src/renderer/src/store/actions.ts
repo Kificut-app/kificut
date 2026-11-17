@@ -61,7 +61,8 @@ export function newProject(name: string, settings: Partial<ProjectSettings>): vo
   set({ zoom: 60 })
 }
 
-async function adopt(opened: OpenedProject): Promise<void> {
+/** Loads a project the main process has read, then checks its media. */
+export async function adopt(opened: OpenedProject): Promise<void> {
   const loaded = parseProjectFile(opened.data)
   loadProject(loaded, opened.path)
   await refreshMediaStatus()
@@ -88,14 +89,15 @@ export async function openProjectPath(path: string): Promise<void> {
   }
 }
 
-export async function saveProject(saveAs = false): Promise<boolean> {
+/** Saves the project. With an explicit path no dialog is shown. */
+export async function saveProject(saveAs = false, explicitPath?: string): Promise<boolean> {
   const state = get()
   if (!state.project) return false
   let snapshot = state.project
   const firstSave = !state.filePath
   try {
     const target = await window.kificut.project.save(
-      saveAs ? null : state.filePath,
+      explicitPath ?? (saveAs ? null : state.filePath),
       toProjectFile(snapshot),
       snapshot.name
     )
@@ -355,11 +357,23 @@ function ensureTrack(draft: Draft<Project>, kind: TrackKind, index: number): str
 
 /* Placing clips */
 
+export interface SourceRange {
+  /** Source time to start from, in seconds. */
+  inPoint: number
+  /** Length on the timeline, in seconds. */
+  duration: number
+}
+
 /**
  * Drops media onto the timeline. Video with sound becomes a linked pair: the picture on a video
- * track and the sound on the matching audio track.
+ * track and the sound on the matching audio track. A range places only part of the source.
  */
-export function placeMedia(mediaId: string, time: number, trackId?: string | null): string[] {
+export function placeMedia(
+  mediaId: string,
+  time: number,
+  trackId?: string | null,
+  range?: SourceRange
+): string[] {
   const current = project()
   const item = current?.media.find((m) => m.id === mediaId)
   if (!current || !item) return []
@@ -384,6 +398,12 @@ export function placeMedia(mediaId: string, time: number, trackId?: string | nul
         : ensureTrack(draft, 'audio', index)
       : null
     created = clipsForMedia(item, videoTrack, audioTrack, start)
+    if (range) {
+      for (const clip of created) {
+        clip.inPoint = item.kind === 'image' ? 0 : Math.max(0, range.inPoint)
+        clip.duration = Math.max(frame(), snapToFrame(range.duration, fps()))
+      }
+    }
     draft.clips.push(...created)
     resolveOverlaps(
       draft as Project,
@@ -406,7 +426,7 @@ export function appendMedia(mediaId: string): void {
   placeMedia(mediaId, projectDuration(current))
 }
 
-function placeOverlay(clip: Clip): void {
+function placeOverlay(clip: Clip): string {
   const current = project()!
   const end = clip.start + clip.duration
   let trackId = clip.trackId
@@ -421,11 +441,18 @@ function placeOverlay(clip: Clip): void {
     resolveOverlaps(draft as Project, [clip.id])
   })
   select([clip.id])
+  return clip.id
 }
 
-export function addTextClip(presetId = 'title', time?: number, trackId?: string): void {
+/** Adds a text layer and returns its clip id. */
+export function addTextClip(
+  presetId = 'title',
+  time?: number,
+  trackId?: string,
+  duration = 5
+): string | null {
   const current = project()
-  if (!current) return
+  if (!current) return null
   const preset = TEXT_PRESETS.find((p) => p.id === presetId) ?? TEXT_PRESETS[0]
   const { width, height } = current.settings
   const factor = Math.min(width, height) / 1080
@@ -439,7 +466,7 @@ export function addTextClip(presetId = 'title', time?: number, trackId?: string)
     name: preset.label,
     trackId: trackId ?? '',
     start,
-    duration: 5,
+    duration: Math.max(frame(), snapToFrame(duration, fps())),
     text: style,
     transform: {
       ...defaultTransform(),
@@ -447,21 +474,22 @@ export function addTextClip(presetId = 'title', time?: number, trackId?: string)
       y: Math.round(preset.y * height)
     }
   })
-  placeOverlay(clip)
+  return placeOverlay(clip)
 }
 
-export function addSolidClip(color: string, time?: number, trackId?: string): void {
-  if (!project()) return
+/** Adds a solid color layer and returns its clip id. */
+export function addSolidClip(color: string, time?: number, trackId?: string, duration = 5): string | null {
+  if (!project()) return null
   const start = snapToFrame(time ?? get().playhead, fps())
   const clip = createClip({
     kind: 'solid',
     name: 'Color',
     trackId: trackId ?? '',
     start,
-    duration: 5,
+    duration: Math.max(frame(), snapToFrame(duration, fps())),
     solidColor: color
   })
-  placeOverlay(clip)
+  return placeOverlay(clip)
 }
 
 /* Editing */

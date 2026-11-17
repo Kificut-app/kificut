@@ -1,10 +1,23 @@
 import { app, BrowserWindow } from 'electron'
 import { createHash } from 'node:crypto'
 import { existsSync } from 'node:fs'
-import { mkdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises'
-import { basename, extname, join } from 'node:path'
-import type { Filmstrip, MediaItem, MediaKind, ProbeResult, ProxyStatus, Waveform } from '@shared/types'
+import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises'
+import { homedir } from 'node:os'
+import { basename, extname, join, resolve } from 'node:path'
+import type {
+  Filmstrip,
+  MediaAnalysis,
+  MediaFileEntry,
+  MediaFileList,
+  MediaItem,
+  MediaKind,
+  ProbeResult,
+  ProxyStatus,
+  SampledFrame,
+  Waveform
+} from '@shared/types'
 import { IPC } from '@shared/ipc'
+import { isMediaFile } from '@shared/media-formats'
 import { createLimiter, ffmpegPath, ffprobePath, run } from './ffmpeg'
 
 const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'webp', 'bmp', 'gif', 'tif', 'tiff'])
@@ -339,4 +352,186 @@ export async function requestProxy(path: string): Promise<ProxyStatus> {
   })
 
   return pending
+}
+
+/* Helpers for AI tools */
+
+export function expandHome(path: string): string {
+  if (path === '~') return homedir()
+  if (path.startsWith('~/') || path.startsWith('~\\')) return join(homedir(), path.slice(2))
+  return path
+}
+
+const MAX_LISTED_FILES = 500
+
+/** Media files in a folder, optionally three levels deep. Hidden files and folders are skipped. */
+export async function listMediaFiles(folder: string, recursive: boolean): Promise<MediaFileList> {
+  const root = resolve(expandHome(folder))
+  const info = await stat(root).catch(() => null)
+  if (!info?.isDirectory()) throw new Error(`Not a folder: ${root}`)
+
+  const files: MediaFileEntry[] = []
+  let truncated = false
+  const walk = async (dir: string, depth: number): Promise<void> => {
+    const entries = await readdir(dir, { withFileTypes: true }).catch(() => [])
+    for (const entry of entries) {
+      if (entry.name.startsWith('.')) continue
+      const full = join(dir, entry.name)
+      if (entry.isDirectory()) {
+        if (recursive && depth < 3) await walk(full, depth + 1)
+      } else if (entry.isFile() && isMediaFile(entry.name)) {
+        if (files.length >= MAX_LISTED_FILES) {
+          truncated = true
+          return
+        }
+        const s = await stat(full).catch(() => null)
+        if (s) files.push({ path: full, name: entry.name, size: s.size, modified: s.mtime.toISOString() })
+      }
+    }
+  }
+  await walk(root, 0)
+  files.sort((a, b) => a.path.localeCompare(b.path))
+  return { folder: root, files, truncated }
+}
+
+/** Still frames across a source range, scaled so the longest side is 640 pixels, as base64 JPEG. */
+export async function sampleFrames(
+  path: string,
+  duration: number,
+  count: number,
+  start = 0,
+  end = duration
+): Promise<SampledFrame[]> {
+  const dir = await cacheDir(path)
+  const still = duration <= 0
+  const from = Math.max(0, Math.min(start, duration))
+  const to = Math.max(from, Math.min(end > 0 ? end : duration, duration))
+  const span = to - from
+  const times = still ? [0] : Array.from({ length: count }, (_, i) => from + ((i + 0.5) * span) / count)
+
+  return Promise.all(
+    times.map((time) =>
+      thumbLimit(async () => {
+        const out = join(dir, `inspect_${Math.round(time * 1000)}.jpg`)
+        if (!existsSync(out)) {
+          const args = ['-hide_banner', '-loglevel', 'error']
+          if (time > 0) args.push('-ss', time.toFixed(3))
+          args.push(
+            '-i',
+            path,
+            '-frames:v',
+            '1',
+            '-vf',
+            'scale=w=640:h=640:force_original_aspect_ratio=decrease',
+            '-q:v',
+            '4',
+            '-y',
+            out
+          )
+          const result = await run(ffmpegPath(), args)
+          if (result.code !== 0 || !existsSync(out))
+            throw new Error(`Could not read a frame at ${time.toFixed(2)}s`)
+        }
+        return { time, data: (await readFile(out)).toString('base64') }
+      })
+    )
+  )
+}
+
+/** Scene changes (video) and silences (audio) found by FFmpeg. Results are cached per file. */
+export async function analyzeMedia(
+  path: string,
+  duration: number,
+  hasVideo: boolean,
+  hasAudio: boolean
+): Promise<MediaAnalysis> {
+  const dir = await cacheDir(path)
+  const cached = join(dir, 'analysis.json')
+  if (existsSync(cached)) return JSON.parse(await readFile(cached, 'utf8')) as MediaAnalysis
+
+  const args = ['-hide_banner', '-nostats', '-i', path]
+  if (hasVideo) args.push('-vf', "scale=320:-2,select='gt(scene,0.3)',showinfo")
+  else args.push('-vn')
+  if (hasAudio) args.push('-af', 'silencedetect=noise=-35dB:d=0.6')
+  else args.push('-an')
+  args.push('-f', 'null', '-')
+
+  const scenes: number[] = []
+  const silences: Array<{ start: number; end: number }> = []
+  let open: number | null = null
+  let pending = ''
+  const round = (n: number) => Math.round(n * 100) / 100
+  const result = await run(ffmpegPath(), args, {
+    collectStdout: false,
+    onStderr: (chunk) => {
+      pending += chunk.toString()
+      const lines = pending.split(/\r?\n/)
+      pending = lines.pop() ?? ''
+      for (const line of lines) {
+        const scene = /showinfo.*pts_time:\s*([\d.]+)/.exec(line)
+        if (scene) scenes.push(round(parseFloat(scene[1])))
+        const silenceStart = /silence_start:\s*(-?[\d.]+)/.exec(line)
+        if (silenceStart) open = Math.max(0, parseFloat(silenceStart[1]))
+        const silenceEnd = /silence_end:\s*([\d.]+)/.exec(line)
+        if (silenceEnd && open !== null) {
+          silences.push({ start: round(open), end: round(parseFloat(silenceEnd[1])) })
+          open = null
+        }
+      }
+    }
+  })
+  if (result.code !== 0) throw new Error(lastLine(result.stderr) || 'Analysis failed.')
+  if (open !== null) silences.push({ start: round(open), end: round(duration) })
+
+  const analysis: MediaAnalysis = { scenes, silences }
+  await writeFile(cached, JSON.stringify(analysis))
+  return analysis
+}
+
+const MAX_DECODE_SECONDS = 3 * 60 * 60
+
+/** Decodes a file's audio to mono 32-bit float samples, for speech recognition. */
+export async function decodeAudio(path: string, sampleRate: number): Promise<Float32Array> {
+  const result = await run(ffmpegPath(), [
+    '-hide_banner',
+    '-loglevel',
+    'error',
+    '-i',
+    path,
+    '-vn',
+    '-ac',
+    '1',
+    '-ar',
+    String(sampleRate),
+    '-t',
+    String(MAX_DECODE_SECONDS),
+    '-f',
+    'f32le',
+    '-acodec',
+    'pcm_f32le',
+    'pipe:1'
+  ])
+  if (result.code !== 0) throw new Error(lastLine(result.stderr) || 'Could not read the audio.')
+  const bytes = result.stdout
+  // Copy into a fresh, aligned buffer; Node's pooled buffers can start at an odd offset.
+  const samples = new Float32Array(Math.floor(bytes.length / 4))
+  new Uint8Array(samples.buffer).set(bytes.subarray(0, samples.length * 4))
+  return samples
+}
+
+/** Saves generated media (such as a voiceover) in Documents/Kificut/Generated. */
+export async function saveGenerated(name: string, data: Uint8Array): Promise<string> {
+  const dir = join(app.getPath('documents'), 'Kificut', 'Generated')
+  await mkdir(dir, { recursive: true })
+  const dot = name.lastIndexOf('.')
+  const stem =
+    (dot > 0 ? name.slice(0, dot) : name)
+      .replace(/[^\w\- ]+/g, '')
+      .trim()
+      .slice(0, 60) || 'generated'
+  const ext = dot > 0 ? name.slice(dot).replace(/[^\w.]/g, '') : '.wav'
+  let target = join(dir, `${stem}${ext}`)
+  for (let i = 2; existsSync(target); i++) target = join(dir, `${stem} ${i}${ext}`)
+  await writeFile(target, data)
+  return target
 }

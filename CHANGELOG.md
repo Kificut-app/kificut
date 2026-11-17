@@ -4,6 +4,21 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.2.0]
+
+AI features, all optional and off until you turn them on.
+
+### Added
+
+- Claude connector: install it in Claude Desktop from Settings and let Claude import media, look at frames, find scene changes and silences, build the timeline, add titles and export. Every change is a normal undo step, and access can be turned off in Settings
+- The connector is attached to each release as a `.mcpb` file
+- AI models on this computer: install Kokoro for voiceovers and Whisper Base or Small for speech to text from the new AI window. Downloads are pinned and hash checked, and the models run offline
+- Voice tab: type a script, pick one of 28 voices and add the voiceover at the playhead
+- Generate Captions on any clip with speech, with automatic language detection
+- Assistant tab: chat with an AI that edits the project, using your own key for Anthropic, OpenAI, Google Gemini or OpenRouter, or a local model through Ollama, LM Studio or any OpenAI compatible server. Keys are encrypted with the system key store
+- New assistant tools: `generate_voiceover`, `transcribe_media` and `add_captions`, plus `list_ai_models` and `install_ai_model` so Claude or the Assistant can install a model when you ask. No model ships with the app
+- Model downloads retry and resume when the connection drops or the network changes
+
 ## [0.1.0]
 
 First public version.

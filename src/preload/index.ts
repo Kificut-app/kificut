@@ -1,7 +1,9 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
-import { IPC, type KificutApi, type MenuCommand } from '@shared/ipc'
+import { IPC, type AiCall, type KificutApi, type MenuCommand } from '@shared/ipc'
 import type { ExportProgress } from '@shared/export-formats'
-import type { ProxyStatus } from '@shared/types'
+import type { AiStatus, ProxyStatus } from '@shared/types'
+import type { ModelStatus } from '@shared/models'
+import type { AssistantEvent } from '@shared/assistant'
 
 function subscribe<T extends unknown[]>(channel: string, callback: (...args: T) => void): () => void {
   const listener = (_event: Electron.IpcRendererEvent, ...args: unknown[]) => callback(...(args as T))
@@ -11,10 +13,16 @@ function subscribe<T extends unknown[]>(channel: string, callback: (...args: T) 
   }
 }
 
-const appVersion = process.argv.find((arg) => arg.startsWith('--app-version='))?.split('=')[1] ?? ''
+function argument(name: string): string {
+  const prefix = `--${name}=`
+  return process.argv.find((arg) => arg.startsWith(prefix))?.slice(prefix.length) ?? ''
+}
+
+const appVersion = argument('app-version')
 
 const api: KificutApi = {
   platform: process.platform,
+  homeDir: argument('home-dir'),
   versions: {
     app: appVersion,
     electron: process.versions.electron,
@@ -33,7 +41,42 @@ const api: KificutApi = {
     locate: (name) => ipcRenderer.invoke(IPC.mediaLocate, name),
     proxy: (path) => ipcRenderer.invoke(IPC.mediaProxy, path),
     onProxyProgress: (callback) =>
-      subscribe<[string, ProxyStatus]>(IPC.mediaProxyProgress, (path, status) => callback(path, status))
+      subscribe<[string, ProxyStatus]>(IPC.mediaProxyProgress, (path, status) => callback(path, status)),
+    listFiles: (folder, recursive) => ipcRenderer.invoke(IPC.mediaListFiles, folder, recursive),
+    sampleFrames: (path, duration, count, start, end) =>
+      ipcRenderer.invoke(IPC.mediaSampleFrames, path, duration, count, start, end),
+    analyze: (path, duration, hasVideo, hasAudio) =>
+      ipcRenderer.invoke(IPC.mediaAnalyze, path, duration, hasVideo, hasAudio),
+    decodeAudio: (path, sampleRate) => ipcRenderer.invoke(IPC.mediaDecodeAudio, path, sampleRate),
+    saveGenerated: (name, data) => ipcRenderer.invoke(IPC.mediaSaveGenerated, name, data)
+  },
+
+  models: {
+    list: () => ipcRenderer.invoke(IPC.modelsList),
+    install: (id) => ipcRenderer.invoke(IPC.modelsInstall, id),
+    cancel: (id) => ipcRenderer.invoke(IPC.modelsCancel, id),
+    remove: (id) => ipcRenderer.invoke(IPC.modelsRemove, id),
+    onStatus: (callback) => subscribe<[ModelStatus]>(IPC.modelsStatus, callback)
+  },
+
+  assistant: {
+    settings: () => ipcRenderer.invoke(IPC.assistantSettings),
+    updateProvider: (update) => ipcRenderer.invoke(IPC.assistantUpdateProvider, update),
+    setActive: (id) => ipcRenderer.invoke(IPC.assistantSetActive, id),
+    listModels: (id) => ipcRenderer.invoke(IPC.assistantListModels, id),
+    send: (text) => ipcRenderer.invoke(IPC.assistantSend, text),
+    stop: () => ipcRenderer.invoke(IPC.assistantStop),
+    reset: () => ipcRenderer.invoke(IPC.assistantReset),
+    onEvent: (callback) => subscribe<[AssistantEvent]>(IPC.assistantEvent, callback)
+  },
+
+  ai: {
+    onCall: (callback) => subscribe<[AiCall]>(IPC.aiCall, callback),
+    respond: (callId, result) => ipcRenderer.send(IPC.aiResult, callId, result),
+    ready: () => ipcRenderer.send(IPC.aiReady),
+    status: () => ipcRenderer.invoke(IPC.aiStatus),
+    onStatus: (callback) => subscribe<[AiStatus]>(IPC.aiStatusChanged, callback),
+    installClaude: () => ipcRenderer.invoke(IPC.aiInstallClaude)
   },
 
   project: {

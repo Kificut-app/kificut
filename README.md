@@ -26,6 +26,15 @@ Kificut is a multi-track editor built on Electron and FFmpeg. The preview is dra
 - Fade in and out on any clip, per clip volume in dB, speed from 10% to 1600% with pitch kept
 - Stereo output meter
 
+**AI, on your terms**
+
+- Voiceovers from a script with Kokoro, 28 natural English voices, generated on your computer
+- Captions from speech with Whisper in about 100 languages, also on your computer. Right click a clip and choose Generate Captions
+- An assistant panel that edits with you. Bring your own key for Anthropic, OpenAI, Google Gemini or OpenRouter, or use a local model through Ollama, LM Studio or any OpenAI compatible server
+- Connect Claude Desktop and ask for edits in plain language: "make a 30 second reel from the clips in my Trip folder with a title and some music". See [Use Kificut from Claude](#use-kificut-from-claude)
+
+See [AI features](#ai-features) for what runs where.
+
 **Media and export**
 
 - Imports anything FFmpeg can read. Footage the preview cannot decode directly (ProRes, DNxHD, AVI, MPEG-2 and so on) gets a lightweight preview copy in the background, and exports always use the original file
@@ -37,6 +46,55 @@ Kificut is a multi-track editor built on Electron and FFmpeg. The preview is dra
 Installers for Windows and macOS are attached to each [release](https://github.com/Kificut-app/kificut/releases).
 
 Release builds are not code signed yet. On macOS, try to open the app once, then go to System Settings > Privacy & Security and choose Open Anyway. On Windows, choose "More info" and then "Run anyway" if SmartScreen asks.
+
+## AI features
+
+Everything AI in Kificut is optional, and nothing is downloaded or sent anywhere until you turn it on. Open it with the sparkle button in the top bar.
+
+**Models on this computer**
+
+| Model                                                        | Used for               | Download | License                             |
+| ------------------------------------------------------------ | ---------------------- | -------- | ----------------------------------- |
+| [Kokoro 82M](https://huggingface.co/hexgrad/Kokoro-82M)      | Voiceovers (Voice tab) | 108 MB   | Apache-2.0, eSpeak NG under GPL-3.0 |
+| [Whisper Base](https://huggingface.co/openai/whisper-base)   | Captions, transcripts  | 81 MB    | MIT                                 |
+| [Whisper Small](https://huggingface.co/openai/whisper-small) | Better captions        | 254 MB   | MIT                                 |
+
+None of these models ship with Kificut. Install the ones you want from **AI > Models on this computer**, or ask your assistant to do it ("install the voice model"): Claude Desktop and the Assistant tab can list the models and install one with the `install_ai_model` tool, and they are told to check with you first because of the download size. They are downloaded from Hugging Face at a pinned revision, every file is checked against its published hash, and they run inside Kificut with ONNX Runtime on the CPU. Your footage and scripts never leave the computer, and the models work offline once installed. Generated voiceovers are saved as WAV files in `Documents/Kificut/Generated`.
+
+Kokoro uses eSpeak NG to turn text into phonemes. eSpeak NG is GPL licensed, so it is downloaded together with the model instead of being part of Kificut.
+
+**Assistant with your own key**
+
+The Assistant tab next to the Inspector is a chat that edits the open project with the same tools as the Claude connector. Pick a provider under **AI > Assistant**:
+
+- **Anthropic** (Claude Opus 5.5 by default), **OpenAI**, **Google Gemini** or **OpenRouter** with your API key
+- **Ollama** or **LM Studio** to run a model on your own computer, no key needed
+- **Other**: any server with an OpenAI style `/chat/completions` endpoint, such as vLLM or LiteLLM
+
+Keys are encrypted with the system key store (Keychain on macOS, DPAPI on Windows) and stay in Kificut's main process; the window that draws the interface never sees them. While you chat, your messages, the project details and any frames the assistant looks at go to the provider you chose. With Claude models that support it, Kificut turns on Anthropic's default refusal fallback, so a request Claude declines can be answered by another Claude model. Usage is billed by your provider to your account.
+
+## Use Kificut from Claude
+
+Kificut comes with a connector for [Claude Desktop](https://claude.ai/download). Once it is installed, Claude can work in Kificut on your behalf: look through your footage, find scene changes and silences, place and trim clips, add titles and music, check frames, and export. You watch the timeline change as it works, and every change can be undone with Ctrl+Z (Cmd+Z on a Mac).
+
+**Install it**
+
+1. Install Claude Desktop and sign in.
+2. In Kificut, open Settings and click **Install in Claude Desktop** under Claude. (You can also download `Kificut-<version>-claude.mcpb` from the [release](https://github.com/Kificut-app/kificut/releases) and double-click it.)
+3. Confirm the install in Claude Desktop.
+
+**Try asking**
+
+- "Look at the videos in ~/Movies/Lisbon and make a one minute highlight reel with a title at the start."
+- "Cut the silent parts out of interview.mp4."
+- "Add lower thirds with each speaker's name, then export a 1080p MP4 to my Desktop."
+
+**Good to know**
+
+- Kificut needs to be installed. If it is closed, the connector opens it.
+- Claude sees the project details, file names and the frames it asks for. Nothing else on your computer is shared through the connector.
+- It can only edit through the tools Kificut provides. Saves and exports never replace existing files, and Claude Desktop asks you before it uses a tool unless you allow it.
+- You can turn access off at any time in Settings, under Claude.
 
 ## Building from source
 
@@ -104,6 +162,9 @@ These are not in yet. Help is welcome on any of them.
 - Audio effects such as EQ, compression and noise reduction
 - Hardware encoders (NVENC, Quick Sync, VideoToolbox) without a custom FFmpeg build
 - Subtitle import and export (SRT, VTT)
+- Editing by transcript (select words to cut them)
+- More voices and languages for voiceovers
+- A ChatGPT connector
 - Translations
 
 ## Contributing

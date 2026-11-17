@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { CircleAlert, CircleCheck, ExternalLink } from 'lucide-react'
 import type { AppSettings, ToolInfo } from '@shared/types'
 import { setDialog, useEditor } from '../../store/editor'
+import { toast, useUi } from '../../store/ui'
 import { altKey, deleteKey, isMac, modKey, shiftKey } from '../../lib/platform'
 import { Button, Kbd, Select, Switch } from '../ui/controls'
 import { Modal } from '../ui/overlays'
@@ -40,6 +41,23 @@ export function PreferencesDialog() {
   }
 
   if (!settings) return null
+
+  const installClaude = async () => {
+    const result = await window.kificut.ai.installClaude()
+    if (result.ok) {
+      toast({
+        kind: 'info',
+        title: 'Opening Claude Desktop',
+        message: 'Confirm the install there, then ask Claude to edit something in Kificut.'
+      })
+    } else {
+      toast({
+        kind: 'error',
+        title: 'Could not open the connector',
+        message: `${result.error ?? ''}\nClaude Desktop needs to be installed first.`.trim()
+      })
+    }
+  }
 
   return (
     <Modal title="Settings" onClose={() => setDialog(null)} width={600}>
@@ -89,6 +107,19 @@ export function PreferencesDialog() {
             onChange={(proxyAboveHeight) => void update({ proxyAboveHeight })}
           />
         </SettingRow>
+
+        <h3 className="settings__heading">Claude</h3>
+        <SettingRow
+          label="Let Claude edit in Kificut"
+          detail="With the Kificut connector, Claude Desktop can import media, build the timeline and export. Every change can be undone."
+        >
+          <Switch
+            checked={settings.connectorEnabled}
+            onChange={(connectorEnabled) => void update({ connectorEnabled })}
+            label="Let Claude edit in Kificut"
+          />
+        </SettingRow>
+        <ClaudeConnector enabled={settings.connectorEnabled} onInstall={() => void installClaude()} />
 
         <h3 className="settings__heading">FFmpeg</h3>
         <p className="settings__note">
@@ -252,5 +283,33 @@ export function AboutDialog() {
         </div>
       </div>
     </Modal>
+  )
+}
+
+function ClaudeConnector({ enabled, onInstall }: { enabled: boolean; onInstall: () => void }) {
+  const status = useUi((s) => s.ai.status)
+  const state = !enabled
+    ? 'Off'
+    : status?.connected
+      ? `Connected to ${status.client ?? 'Claude'}`
+      : 'Not connected yet'
+  return (
+    <div className="tool">
+      <div className="tool__status">
+        {enabled && status?.connected ? (
+          <CircleCheck size={15} className="is-success" />
+        ) : (
+          <span className="tool__idle" />
+        )}
+        <span className="tool__name">Claude Desktop</span>
+        <span className="tool__version">{state}</span>
+      </div>
+      <div className="tool__path">Claude sees the project details, file names and frames it asks for.</div>
+      <div className="tool__actions">
+        <Button size="sm" disabled={!enabled || status?.bundleAvailable === false} onClick={onInstall}>
+          Install in Claude Desktop
+        </Button>
+      </div>
+    </div>
   )
 }

@@ -4,7 +4,7 @@ import type { AppSettings, Project, ProxyStatus } from '@shared/types'
 import { withLinked } from '../lib/timeline'
 
 export type Tool = 'select' | 'razor'
-export type DialogId = 'export' | 'preferences' | 'shortcuts' | 'about' | null
+export type DialogId = 'export' | 'preferences' | 'shortcuts' | 'about' | 'ai' | null
 
 const MAX_HISTORY = 200
 const COALESCE_MS = 900

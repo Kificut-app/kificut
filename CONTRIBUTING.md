@@ -20,6 +20,8 @@ On Linux you may need the usual Electron runtime libraries (GTK 3, NSS, ALSA). A
 ```
 src/
   main/        Electron main process: windows, menus, dialogs, FFmpeg, file access
+    assistant/   The in-app assistant: provider settings, encrypted keys, Anthropic and
+                 OpenAI compatible adapters
   preload/     The bridge that exposes window.kificut to the renderer
   shared/      Code used by both sides: the project model, IPC contract, time helpers,
                layer geometry and the FFmpeg filter graph builder
@@ -30,9 +32,16 @@ src/
       lib/         Pure helpers: timeline operations, factories, media utilities
       components/  React UI, grouped by panel
       styles/      CSS, with design tokens in tokens.css
+      ai/          Tools that assistants such as Claude call to edit
+      local-ai/    Kokoro and Whisper running in a worker, voiceovers and captions
+connectors/
+  claude/      The Claude Desktop connector (an MCP server, packed as a .mcpb bundle)
+scripts/       Build helpers: the connector bundle, FFprobe download, brand sound
 ```
 
 `docs/ARCHITECTURE.md` explains how preview and export fit together.
+
+To test the assistant without spending money on an API, point the **Other (OpenAI compatible)** provider at a local server such as Ollama or LM Studio. `src/main/assistant/providers.test.ts` shows how both adapters are tested against small mock servers.
 
 ## Checks
 

@@ -11,7 +11,8 @@ const DEFAULTS: AppSettings = {
   proxyAboveHeight: 0,
   previewScale: 1,
   showWaveforms: true,
-  showThumbnails: true
+  showThumbnails: true,
+  connectorEnabled: true
 }
 
 const MAX_RECENT = 12

@@ -1,12 +1,19 @@
 import type { ExportProgress, ExportResult, ExportSettings } from './export-formats'
 import type { OverlayImage } from './ffmpeg-graph'
+import type { ToolResult } from './ai-tools'
+import type { ModelStatus } from './models'
+import type { AssistantEvent, AssistantSettings, ProviderId, ProviderUpdate } from './assistant'
 import type {
+  AiStatus,
   AppSettings,
   Filmstrip,
+  MediaAnalysis,
+  MediaFileList,
   ProbeResult,
   Project,
   ProxyStatus,
   RecentProject,
+  SampledFrame,
   ToolInfo,
   Waveform
 } from './types'
@@ -56,8 +63,15 @@ export interface ExportRequest {
 
 export type { OverlayImage }
 
+export interface AiCall {
+  callId: number
+  name: string
+  args: Record<string, unknown>
+}
+
 export interface KificutApi {
   platform: string
+  homeDir: string
   versions: { app: string; electron: string; chrome: string; node: string }
   getPathForFile(file: File): string
 
@@ -71,6 +85,53 @@ export interface KificutApi {
     locate(name: string): Promise<string | null>
     proxy(path: string): Promise<ProxyStatus>
     onProxyProgress(callback: (path: string, status: ProxyStatus) => void): () => void
+    listFiles(folder: string, recursive: boolean): Promise<MediaFileList>
+    sampleFrames(
+      path: string,
+      duration: number,
+      count: number,
+      start?: number,
+      end?: number
+    ): Promise<SampledFrame[]>
+    analyze(path: string, duration: number, hasVideo: boolean, hasAudio: boolean): Promise<MediaAnalysis>
+    /** Mono PCM samples of the file's audio, for speech recognition. */
+    decodeAudio(path: string, sampleRate: number): Promise<Float32Array>
+    /** Saves generated audio (WAV bytes) to Documents/Kificut/Generated and returns the path. */
+    saveGenerated(name: string, data: Uint8Array): Promise<string>
+  }
+
+  models: {
+    list(): Promise<ModelStatus[]>
+    install(id: string): Promise<ModelStatus>
+    cancel(id: string): Promise<void>
+    remove(id: string): Promise<ModelStatus>
+    onStatus(callback: (status: ModelStatus) => void): () => void
+  }
+
+  assistant: {
+    settings(): Promise<AssistantSettings>
+    updateProvider(update: ProviderUpdate): Promise<AssistantSettings>
+    setActive(id: ProviderId | null): Promise<AssistantSettings>
+    /** Models the provider offers. Also checks that the key and address work. */
+    listModels(id: ProviderId): Promise<Array<{ id: string; name: string }>>
+    /** Starts a reply; progress arrives through onEvent. Returns the turn id. */
+    send(text: string): Promise<number>
+    stop(): Promise<void>
+    /** Forgets the conversation. */
+    reset(): Promise<void>
+    onEvent(callback: (event: AssistantEvent) => void): () => void
+  }
+
+  ai: {
+    /** Tool calls arriving from a connected assistant. Answer each with respond(). */
+    onCall(callback: (call: AiCall) => void): () => void
+    respond(callId: number, result: ToolResult): void
+    /** Tells Kificut the renderer can take tool calls. */
+    ready(): void
+    status(): Promise<AiStatus>
+    onStatus(callback: (status: AiStatus) => void): () => void
+    /** Opens the bundled Claude Desktop connector so Claude Desktop installs it. */
+    installClaude(): Promise<{ ok: boolean; error?: string }>
   }
 
   project: {
@@ -138,5 +199,29 @@ export const IPC = {
   appClose: 'app:close',
   appMenu: 'app:menu',
   appCloseRequest: 'app:close-request',
-  appOpenProject: 'app:open-project'
+  appOpenProject: 'app:open-project',
+  mediaListFiles: 'media:list-files',
+  mediaSampleFrames: 'media:sample-frames',
+  mediaAnalyze: 'media:analyze',
+  aiCall: 'ai:call',
+  aiResult: 'ai:result',
+  aiReady: 'ai:ready',
+  aiStatus: 'ai:status',
+  aiStatusChanged: 'ai:status-changed',
+  aiInstallClaude: 'ai:install-claude',
+  mediaDecodeAudio: 'media:decode-audio',
+  mediaSaveGenerated: 'media:save-generated',
+  modelsList: 'models:list',
+  modelsInstall: 'models:install',
+  modelsCancel: 'models:cancel',
+  modelsRemove: 'models:remove',
+  modelsStatus: 'models:status',
+  assistantSettings: 'assistant:settings',
+  assistantUpdateProvider: 'assistant:update-provider',
+  assistantSetActive: 'assistant:set-active',
+  assistantListModels: 'assistant:list-models',
+  assistantSend: 'assistant:send',
+  assistantStop: 'assistant:stop',
+  assistantReset: 'assistant:reset',
+  assistantEvent: 'assistant:event'
 } as const

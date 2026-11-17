@@ -2,3 +2,6 @@ out
 release
 node_modules
 package-lock.json
+vendor
+connectors/claude/build
+connectors/claude/dist

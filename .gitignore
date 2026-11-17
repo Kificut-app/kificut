@@ -10,3 +10,5 @@ Thumbs.db
 !.vscode/extensions.json
 .idea
 *.tsbuildinfo
+connectors/claude/build
+connectors/claude/dist

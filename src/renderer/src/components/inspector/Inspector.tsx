@@ -29,6 +29,9 @@ import {
 import { defaultColor, defaultTransform, FRAME_RATES, RESOLUTION_PRESETS } from '../../lib/factory'
 import { maxDuration, mediaFor, projectDuration, resolveOverlaps, withLinked } from '../../lib/timeline'
 import { useFonts } from '../../lib/fonts'
+import { useUi } from '../../store/ui'
+import { useAssistant } from '../../store/assistant'
+import { AssistantPanel } from '../assistant/AssistantPanel'
 import {
   Button,
   ColorField,
@@ -44,6 +47,8 @@ import {
 export function Inspector() {
   const project = useEditor((s) => s.project!)
   const selection = useEditor((s) => s.selection)
+  const tab = useUi((s) => s.rightTab)
+  const assistantBusy = useAssistant((s) => s.busy)
 
   const content = useMemo(() => {
     const clips = project.clips.filter((c) => selection.includes(c.id))
@@ -63,10 +68,33 @@ export function Inspector() {
 
   return (
     <section className="panel inspector">
-      <div className="panel__header">
-        <span className="panel__title">Inspector</span>
+      <div className="panel__tabs" role="tablist">
+        {(
+          [
+            ['inspector', 'Inspector'],
+            ['assistant', 'Assistant']
+          ] as const
+        ).map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            aria-selected={tab === id}
+            className={cx('panel__tab', tab === id && 'is-active')}
+            onClick={() => useUi.setState({ rightTab: id })}
+          >
+            {label}
+            {id === 'assistant' && assistantBusy && tab !== 'assistant' && (
+              <span className="panel__tab-dot" />
+            )}
+          </button>
+        ))}
       </div>
-      <div className="panel__body inspector__body">{content}</div>
+      {tab === 'inspector' ? (
+        <div className="panel__body inspector__body">{content}</div>
+      ) : (
+        <AssistantPanel />
+      )}
     </section>
   )
 }

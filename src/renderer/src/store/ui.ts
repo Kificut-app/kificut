@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import type { AiStatus } from '@shared/types'
 
 export interface ToastAction {
   label: string
@@ -43,14 +44,57 @@ export interface ConfirmState {
   resolve: (id: string) => void
 }
 
+export interface AiState {
+  status: AiStatus | null
+  /** What the connected assistant is doing right now, if anything. */
+  activity: string | null
+}
+
+/** Work running in the background, such as a voiceover being generated. */
+export interface BackgroundTask {
+  id: number
+  label: string
+  status: string
+}
+
 interface UiState {
   toasts: Toast[]
   menu: ContextMenuState | null
   confirm: ConfirmState | null
   busy: string | null
+  ai: AiState
+  aiTab: 'models' | 'assistant'
+  rightTab: 'inspector' | 'assistant'
+  tasks: BackgroundTask[]
 }
 
-export const useUi = create<UiState>(() => ({ toasts: [], menu: null, confirm: null, busy: null }))
+export const useUi = create<UiState>(() => ({
+  toasts: [],
+  menu: null,
+  confirm: null,
+  busy: null,
+  ai: { status: null, activity: null },
+  aiTab: 'models',
+  rightTab: 'inspector',
+  tasks: []
+}))
+
+let nextTask = 1
+
+/** Shows a background task in the top bar until end() is called. */
+export function beginTask(label: string): { update: (status: string) => void; end: () => void } {
+  const id = nextTask++
+  useUi.setState((s) => ({ tasks: [...s.tasks, { id, label, status: '' }] }))
+  return {
+    update: (status) =>
+      useUi.setState((s) => ({ tasks: s.tasks.map((t) => (t.id === id ? { ...t, status } : t)) })),
+    end: () => useUi.setState((s) => ({ tasks: s.tasks.filter((t) => t.id !== id) }))
+  }
+}
+
+export function setAiState(patch: Partial<AiState>): void {
+  useUi.setState((s) => ({ ai: { ...s.ai, ...patch } }))
+}
 
 let nextToast = 1
 

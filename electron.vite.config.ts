@@ -15,9 +15,14 @@ export default defineConfig({
     resolve: {
       alias: {
         '@shared': shared,
-        '@renderer': resolve(__dirname, 'src/renderer/src')
+        '@renderer': resolve(__dirname, 'src/renderer/src'),
+        // The GPL eSpeak phonemizer is downloaded with the Kokoro model, not bundled.
+        phonemizer: resolve(__dirname, 'src/renderer/src/local-ai/phonemizer.ts'),
+        // ONNX Runtime's WebAssembly files, served locally instead of from a CDN.
+        'ort-dist': resolve(__dirname, 'node_modules/onnxruntime-web/dist')
       }
     },
-    plugins: [react()]
+    plugins: [react()],
+    worker: { format: 'es' }
   }
 })

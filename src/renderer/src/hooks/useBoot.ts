@@ -1,10 +1,14 @@
 import { useEffect } from 'react'
 import { isDirty, useEditor } from '../store/editor'
 import { handleWindowClose, openProjectPath, saveProject, setProxyStatus } from '../store/actions'
+import { startModelSync } from '../store/models'
+import { startAssistantSync } from '../store/assistant'
 
 /** Wires the renderer to the main process: settings, proxies, window title, close requests and autosave. */
 export function useBoot(): void {
   useEffect(() => {
+    startModelSync()
+    startAssistantSync()
     void window.kificut.settings.get().then((settings) => {
       useEditor.setState({ settings, previewScale: settings.previewScale || 1 })
     })

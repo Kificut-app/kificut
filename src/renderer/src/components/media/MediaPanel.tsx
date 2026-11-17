@@ -20,8 +20,9 @@ import { droppedPaths, endDrag, hasFiles, startDrag } from '../../lib/drag'
 import { cssFontFamily } from '../../engine/text'
 import { modKey } from '../../lib/platform'
 import { Button, ColorField, IconButton, cx } from '../ui/controls'
+import { VoicePanel } from './VoicePanel'
 
-type Tab = 'media' | 'text' | 'elements'
+type Tab = 'media' | 'text' | 'elements' | 'voice'
 
 const NO_MEDIA: MediaItem[] = []
 
@@ -34,7 +35,8 @@ export function MediaPanel() {
           [
             ['media', 'Media'],
             ['text', 'Text'],
-            ['elements', 'Elements']
+            ['elements', 'Elements'],
+            ['voice', 'Voice']
           ] as const
         ).map(([id, label]) => (
           <button
@@ -53,6 +55,7 @@ export function MediaPanel() {
         {tab === 'media' && <MediaBin />}
         {tab === 'text' && <TextPresets />}
         {tab === 'elements' && <Elements />}
+        {tab === 'voice' && <VoicePanel />}
       </div>
     </section>
   )

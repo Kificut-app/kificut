@@ -29,6 +29,11 @@ extraResources:
       - ffmpeg.LICENSE
   - from: LICENSE
     to: licenses/LICENSE
+  # The Claude Desktop connector, opened by Settings > Claude > Install in Claude Desktop.
+  - from: connectors/claude/dist
+    to: connectors
+    filter:
+      - '*.mcpb'
 
 fileAssociations:
   - ext: kificut
