@@ -36,6 +36,7 @@ export function buildMenu(isDev: boolean): void {
       label: app.name,
       submenu: [
         item(`About ${app.name}`, 'about'),
+        item('Check for Updates…', 'check-updates'),
         { type: 'separator' },
         item('Settings…', 'preferences', 'Cmd+,', true),
         { type: 'separator' },
@@ -136,7 +137,13 @@ export function buildMenu(isDev: boolean): void {
       { type: 'separator' },
       { label: 'Documentation', click: () => shell.openExternal(`${REPO_URL}#readme`) },
       { label: 'Report an Issue', click: () => shell.openExternal(`${REPO_URL}/issues/new`) },
-      ...(isMac ? [] : [{ type: 'separator' as const }, item(`About ${app.name}`, 'about')])
+      ...(isMac
+        ? []
+        : [
+            { type: 'separator' as const },
+            item('Check for Updates…', 'check-updates'),
+            item(`About ${app.name}`, 'about')
+          ])
     ]
   })
 

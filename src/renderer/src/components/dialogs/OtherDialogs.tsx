@@ -3,6 +3,8 @@ import { CircleAlert, CircleCheck, ExternalLink } from 'lucide-react'
 import type { AppSettings, ToolInfo } from '@shared/types'
 import { setDialog, useEditor } from '../../store/editor'
 import { toast, useUi } from '../../store/ui'
+import { checkForUpdates, installUpdate, useUpdates } from '../../store/updates'
+import type { ClaudeCodeResult } from '@shared/ipc'
 import { altKey, deleteKey, isMac, modKey, shiftKey } from '../../lib/platform'
 import { Button, Kbd, Select, Switch } from '../ui/controls'
 import { Modal } from '../ui/overlays'
@@ -111,7 +113,7 @@ export function PreferencesDialog() {
         <h3 className="settings__heading">Claude</h3>
         <SettingRow
           label="Let Claude edit in Kificut"
-          detail="With the Kificut connector, Claude Desktop can import media, build the timeline and export. Every change can be undone."
+          detail="Claude Desktop or Claude Code can import media, build the timeline and export. Every change can be undone."
         >
           <Switch
             checked={settings.connectorEnabled}
@@ -120,6 +122,24 @@ export function PreferencesDialog() {
           />
         </SettingRow>
         <ClaudeConnector enabled={settings.connectorEnabled} onInstall={() => void installClaude()} />
+        <ClaudeCodeConnector enabled={settings.connectorEnabled} />
+
+        <h3 className="settings__heading">Updates</h3>
+        <SettingRow
+          label="Check for updates automatically"
+          detail={
+            window.kificut.platform === 'darwin'
+              ? 'Downloads new versions in the background and opens the installer when you are ready.'
+              : 'Downloads new versions in the background and installs them when you restart.'
+          }
+        >
+          <Switch
+            checked={settings.autoUpdate}
+            onChange={(autoUpdate) => void update({ autoUpdate })}
+            label="Check for updates automatically"
+          />
+        </SettingRow>
+        <UpdatePanel />
 
         <h3 className="settings__heading">FFmpeg</h3>
         <p className="settings__note">
@@ -310,6 +330,132 @@ function ClaudeConnector({ enabled, onInstall }: { enabled: boolean; onInstall: 
           Install in Claude Desktop
         </Button>
       </div>
+    </div>
+  )
+}
+
+function ClaudeCodeConnector({ enabled }: { enabled: boolean }) {
+  const [working, setWorking] = useState(false)
+  const [result, setResult] = useState<ClaudeCodeResult | null>(null)
+
+  const connect = async () => {
+    setWorking(true)
+    try {
+      const outcome = await window.kificut.ai.connectClaudeCode()
+      setResult(outcome)
+      if (outcome.ok) {
+        toast({
+          kind: 'success',
+          title: 'Connected to Claude Code',
+          message: 'Start a new Claude Code session and ask it to edit in Kificut.'
+        })
+      }
+    } catch (error) {
+      toast({ kind: 'error', title: 'Could not connect Claude Code', message: String(error) })
+    } finally {
+      setWorking(false)
+    }
+  }
+
+  return (
+    <div className="tool">
+      <div className="tool__status">
+        {result?.ok ? <CircleCheck size={15} className="is-success" /> : <span className="tool__idle" />}
+        <span className="tool__name">Claude Code</span>
+        <span className="tool__version">{result?.ok ? 'Connected' : 'In the terminal or your editor'}</span>
+      </div>
+      <div className="tool__path">Adds Kificut to Claude Code in all your projects.</div>
+      <div className="tool__actions">
+        <Button size="sm" disabled={!enabled || working} onClick={() => void connect()}>
+          {working ? 'Connecting' : 'Connect Claude Code'}
+        </Button>
+      </div>
+      {result && !result.ok && (
+        <div className="claude-code-manual">
+          <p>
+            {result.reason === 'not-found'
+              ? 'Kificut could not find Claude Code on this computer. If it is installed, run this in a terminal:'
+              : `Claude Code did not accept the change${result.error ? ` (${result.error})` : ''}. Run this in a terminal instead:`}
+          </p>
+          <code>{result.command}</code>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              void navigator.clipboard.writeText(result.command)
+              toast({ kind: 'info', title: 'Command copied' })
+            }}
+          >
+            Copy Command
+          </Button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function UpdatePanel() {
+  const status = useUpdates((s) => s.status)
+  const version = window.kificut.versions.app
+  let text: string
+  let action: { label: string; run: () => void; primary?: boolean } | null = {
+    label: 'Check Now',
+    run: () => void checkForUpdates()
+  }
+  switch (status.state) {
+    case 'unsupported':
+      text = status.message
+      action = null
+      break
+    case 'checking':
+      text = 'Checking for updates'
+      action = null
+      break
+    case 'up-to-date':
+      text = 'You have the latest version.'
+      break
+    case 'downloading':
+      text = `Downloading version ${status.version} (${Math.round(status.percent)}%)`
+      action = null
+      break
+    case 'ready':
+      text = `Version ${status.version} is ready. Unsaved work is kept.`
+      action = {
+        label: status.action === 'restart' ? 'Restart to Update' : 'Open Installer',
+        run: () => void installUpdate(),
+        primary: true
+      }
+      break
+    case 'available':
+      text = `Version ${status.version} is available.`
+      action = { label: 'Download', run: () => window.kificut.shell.openExternal(status.url), primary: true }
+      break
+    case 'error':
+      text = status.message
+      break
+    default:
+      text = 'Not checked yet.'
+  }
+  return (
+    <div className="tool">
+      <div className="tool__status">
+        {status.state === 'ready' || status.state === 'available' ? (
+          <CircleAlert size={15} className="is-accent" />
+        ) : status.state === 'up-to-date' ? (
+          <CircleCheck size={15} className="is-success" />
+        ) : (
+          <span className="tool__idle" />
+        )}
+        <span className="tool__name">Kificut {version}</span>
+      </div>
+      <div className="tool__path">{text}</div>
+      {action && (
+        <div className="tool__actions">
+          <Button size="sm" variant={action.primary ? 'primary' : 'default'} onClick={action.run}>
+            {action.label}
+          </Button>
+        </div>
+      )}
     </div>
   )
 }

@@ -167,10 +167,11 @@ function pruneSelection(project: Project, selection: string[]): string[] {
   return next.length === selection.length ? selection : next
 }
 
-export function loadProject(project: Project, filePath: string | null): void {
+/** Loads a project. `unsaved` marks it as having changes, as when restoring recovered work. */
+export function loadProject(project: Project, filePath: string | null, unsaved = false): void {
   set({
     project,
-    savedProject: filePath ? project : null,
+    savedProject: filePath && !unsaved ? project : null,
     filePath,
     past: [],
     future: [],

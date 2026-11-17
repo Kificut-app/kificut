@@ -75,13 +75,20 @@ Keys are encrypted with the system key store (Keychain on macOS, DPAPI on Window
 
 ## Use Kificut from Claude
 
-Kificut comes with a connector for [Claude Desktop](https://claude.ai/download). Once it is installed, Claude can work in Kificut on your behalf: look through your footage, find scene changes and silences, place and trim clips, add titles and music, check frames, and export. You watch the timeline change as it works, and every change can be undone with Ctrl+Z (Cmd+Z on a Mac).
+Kificut works with [Claude Desktop](https://claude.ai/download) and [Claude Code](https://claude.com/claude-code). Once connected, Claude can work in Kificut on your behalf: look through your footage, find scene changes and silences, place and trim clips, add titles and music, check frames, and export. You watch the timeline change as it works, and every change can be undone with Ctrl+Z (Cmd+Z on a Mac).
 
-**Install it**
+**Claude Desktop**
 
 1. Install Claude Desktop and sign in.
 2. In Kificut, open Settings and click **Install in Claude Desktop** under Claude. (You can also download `Kificut-<version>-claude.mcpb` from the [release](https://github.com/Kificut-app/kificut/releases) and double-click it.)
 3. Confirm the install in Claude Desktop.
+
+**Claude Code**
+
+1. In Kificut, open Settings and click **Connect Claude Code** under Claude. Kificut finds Claude Code (the terminal version or the one inside VS Code, Cursor or Windsurf) and adds itself with `claude mcp add` for all your projects.
+2. Start a new Claude Code session and ask it to edit in Kificut. Run `/mcp` to see the connection.
+
+If Kificut cannot find Claude Code, it shows the command to paste into a terminal instead. Click **Connect Claude Code** again if you move Kificut to another folder.
 
 **Try asking**
 
@@ -93,8 +100,17 @@ Kificut comes with a connector for [Claude Desktop](https://claude.ai/download).
 
 - Kificut needs to be installed. If it is closed, the connector opens it.
 - Claude sees the project details, file names and the frames it asks for. Nothing else on your computer is shared through the connector.
-- It can only edit through the tools Kificut provides. Saves and exports never replace existing files, and Claude Desktop asks you before it uses a tool unless you allow it.
+- It can only edit through the tools Kificut provides. Saves and exports never replace existing files, and Claude asks you before it uses a tool unless you allow it.
 - You can turn access off at any time in Settings, under Claude.
+
+## Updates and unsaved work
+
+Kificut checks for new versions in the background (you can turn this off in Settings, under Updates, or check by hand from the Help menu, or the Kificut menu on a Mac).
+
+- **Windows**: the update downloads while you work. Click **Restart to Update** in the top bar, or just quit, and it installs itself. No new installer to download.
+- **macOS**: until release builds are signed with an Apple Developer ID, macOS does not let the app replace itself. Kificut downloads the right installer for your Mac, checks it, and opens it when you click **Install Update**; drag Kificut into Applications to finish.
+
+Either way you do not lose work. While you edit, Kificut keeps a recovery copy of unsaved changes and brings them back after an update, without asking. If Kificut closes unexpectedly (a crash, a power cut), it offers to recover the work the next time it starts. The copy is removed when you save or choose **Don't Save**.
 
 ## Building from source
 

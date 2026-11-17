@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { checkForUpdates } from '../store/updates'
 import { clearSelection, redo, setDialog, undo, useEditor } from '../store/editor'
 import {
   addMarker,
@@ -197,6 +198,9 @@ export function useMenuCommands(): void {
           return
         case 'about':
           setDialog('about')
+          return
+        case 'check-updates':
+          void checkForUpdates()
           return
       }
       if (!hasProject) return

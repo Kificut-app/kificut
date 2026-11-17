@@ -1,6 +1,6 @@
-# Kificut connector for Claude Desktop
+# Kificut connector for Claude
 
-An [MCP](https://modelcontextprotocol.io) server that lets Claude edit in the Kificut app on the same computer. It is packed as an MCP Bundle (`.mcpb`) so it installs in Claude Desktop with one click.
+An [MCP](https://modelcontextprotocol.io) server that lets Claude edit in the Kificut app on the same computer. It is packed as an MCP Bundle (`.mcpb`) so it installs in Claude Desktop with one click, and the same server is registered with Claude Code by Settings > Claude > Connect Claude Code.
 
 Users do not need anything from this folder: the bundle ships inside Kificut (Settings > Claude > Install in Claude Desktop) and with every release. See [Use Kificut from Claude](../../README.md#use-kificut-from-claude).
 
@@ -36,3 +36,9 @@ Start Kificut with `npm run dev` first; development builds do not record a launc
 ## Testing
 
 `kificut-client.test.ts` runs the client against a fake Kificut and is part of `npm test`.
+
+## Trying a local change in Claude Code
+
+```sh
+claude mcp add kificut-dev node /absolute/path/to/kificut/connectors/claude/build/server/index.js
+```

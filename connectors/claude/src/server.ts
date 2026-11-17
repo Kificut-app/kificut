@@ -16,6 +16,7 @@ const server = new Server(
 
 function clientName(): string {
   const name = server.getClientVersion()?.name ?? ''
+  if (/claude[-_ ]?code/i.test(name)) return 'Claude Code'
   if (/claude/i.test(name)) return 'Claude'
   return name || 'An assistant'
 }

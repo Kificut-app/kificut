@@ -6,7 +6,7 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [0.2.0]
 
-AI features, all optional and off until you turn them on.
+AI features (all optional and off until you turn them on), Claude Code support, in-app updates and recovery of unsaved work.
 
 ### Added
 
@@ -18,6 +18,9 @@ AI features, all optional and off until you turn them on.
 - Assistant tab: chat with an AI that edits the project, using your own key for Anthropic, OpenAI, Google Gemini or OpenRouter, or a local model through Ollama, LM Studio or any OpenAI compatible server. Keys are encrypted with the system key store
 - New assistant tools: `generate_voiceover`, `transcribe_media` and `add_captions`, plus `list_ai_models` and `install_ai_model` so Claude or the Assistant can install a model when you ask. No model ships with the app
 - Model downloads retry and resume when the connection drops or the network changes
+- Claude Code support: Settings > Claude > Connect Claude Code adds Kificut to Claude Code, from the terminal or the VS Code, Cursor and Windsurf extensions
+- In-app updates. On Windows they download in the background and install with Restart to Update; on macOS Kificut downloads the installer for your Mac and opens it
+- Recovery of unsaved work after an update, a crash or a forced quit
 
 ## [0.1.0]
 

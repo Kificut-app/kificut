@@ -23,6 +23,10 @@ import {
 } from './media'
 import { cancelModelInstall, installModel, listModelStatus, modelsDir, removeModel } from './models'
 import { registerAssistantIpc } from './assistant'
+import { checkForUpdates, installUpdate, startUpdater, updateStatus } from './updater'
+import { clearRecovery, readRecovery, saveRecovery } from './recovery'
+import { connectClaudeCode } from './claude-code'
+import type { RecoverySnapshot } from '@shared/updates'
 import {
   announceConnectorDisabled,
   connectorStatus,
@@ -199,6 +203,29 @@ function registerIpc(): void {
 
   registerAssistantIpc()
 
+  ipcMain.handle(IPC.updatesGet, () => updateStatus())
+  ipcMain.handle(IPC.updatesCheck, () => checkForUpdates(true))
+  ipcMain.handle(IPC.updatesInstall, async () => {
+    // The renderer has stored any unsaved work, so the windows may close without asking.
+    const allowClose = (force: boolean) => {
+      for (const win of BrowserWindow.getAllWindows()) {
+        const state = windowState.get(win)
+        if (state) state.forceClose = force
+      }
+    }
+    allowClose(true)
+    try {
+      await installUpdate()
+    } catch (error) {
+      allowClose(false)
+      throw error
+    }
+  })
+  ipcMain.handle(IPC.recoverySave, (_event, snapshot: RecoverySnapshot) => saveRecovery(snapshot))
+  ipcMain.handle(IPC.recoveryRead, () => readRecovery())
+  ipcMain.handle(IPC.recoveryClear, () => clearRecovery())
+  ipcMain.handle(IPC.aiConnectClaudeCode, () => connectClaudeCode())
+
   ipcMain.handle(IPC.aiStatus, () => connectorStatus(isConnectorRunning()))
   ipcMain.handle(IPC.aiInstallClaude, async () => {
     const bundle = findClaudeBundle()
@@ -361,6 +388,7 @@ if (!gotLock) {
     registerConnectorIpc(() => BrowserWindow.getAllWindows()[0] ?? createWindow())
     buildMenu(isDev)
     createWindow()
+    startUpdater(() => getSettings().autoUpdate)
     if (getSettings().connectorEnabled) {
       startConnector().catch((error: unknown) => console.error('Could not start the AI connector:', error))
     } else {

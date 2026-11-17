@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import { Download, Loader2, Redo2, Settings, Sparkles, Undo2 } from 'lucide-react'
+import { ArrowDownCircle, Download, Loader2, Redo2, Settings, Sparkles, Undo2 } from 'lucide-react'
 import { isDirty, redo, setDialog, undo, useEditor } from '../store/editor'
 import { renameProject, saveProject } from '../store/actions'
 import { useUi } from '../store/ui'
 import { openAiDialog } from './dialogs/AiDialog'
+import { installUpdate, useUpdates } from '../store/updates'
 import { Button, IconButton, cx } from './ui/controls'
 import { LogoMark } from './Logo'
 import { modKey } from '../lib/platform'
@@ -41,6 +42,7 @@ export function TopBar() {
 
           <TaskChip />
           <AiChip />
+          <UpdateButton />
 
           <div className="topbar__actions">
             <IconButton tip={`Undo|${modKey}Z`} onClick={undo} disabled={!canUndo}>
@@ -119,6 +121,23 @@ function ProjectTitle({ name }: { name: string }) {
       onClick={() => setEditing(true)}
     >
       {name}
+    </button>
+  )
+}
+
+function UpdateButton() {
+  const status = useUpdates((s) => s.status)
+  if (status.state !== 'ready') return null
+  const restart = status.action === 'restart'
+  return (
+    <button
+      type="button"
+      className="update-chip"
+      data-tip={`Kificut ${status.version}. Unsaved work is kept.`}
+      onClick={() => void installUpdate()}
+    >
+      <ArrowDownCircle size={13} />
+      {restart ? 'Restart to Update' : 'Install Update'}
     </button>
   )
 }

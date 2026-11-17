@@ -4,6 +4,7 @@ import type { ExportProgress } from '@shared/export-formats'
 import type { AiStatus, ProxyStatus } from '@shared/types'
 import type { ModelStatus } from '@shared/models'
 import type { AssistantEvent } from '@shared/assistant'
+import type { UpdateStatus } from '@shared/updates'
 
 function subscribe<T extends unknown[]>(channel: string, callback: (...args: T) => void): () => void {
   const listener = (_event: Electron.IpcRendererEvent, ...args: unknown[]) => callback(...(args as T))
@@ -59,6 +60,19 @@ const api: KificutApi = {
     onStatus: (callback) => subscribe<[ModelStatus]>(IPC.modelsStatus, callback)
   },
 
+  updates: {
+    status: () => ipcRenderer.invoke(IPC.updatesGet),
+    check: () => ipcRenderer.invoke(IPC.updatesCheck),
+    install: () => ipcRenderer.invoke(IPC.updatesInstall),
+    onStatus: (callback) => subscribe<[UpdateStatus]>(IPC.updatesStatus, callback)
+  },
+
+  recovery: {
+    save: (snapshot) => ipcRenderer.invoke(IPC.recoverySave, snapshot),
+    read: () => ipcRenderer.invoke(IPC.recoveryRead),
+    clear: () => ipcRenderer.invoke(IPC.recoveryClear)
+  },
+
   assistant: {
     settings: () => ipcRenderer.invoke(IPC.assistantSettings),
     updateProvider: (update) => ipcRenderer.invoke(IPC.assistantUpdateProvider, update),
@@ -76,7 +90,8 @@ const api: KificutApi = {
     ready: () => ipcRenderer.send(IPC.aiReady),
     status: () => ipcRenderer.invoke(IPC.aiStatus),
     onStatus: (callback) => subscribe<[AiStatus]>(IPC.aiStatusChanged, callback),
-    installClaude: () => ipcRenderer.invoke(IPC.aiInstallClaude)
+    installClaude: () => ipcRenderer.invoke(IPC.aiInstallClaude),
+    connectClaudeCode: () => ipcRenderer.invoke(IPC.aiConnectClaudeCode)
   },
 
   project: {

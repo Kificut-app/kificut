@@ -34,6 +34,9 @@ extraResources:
     to: connectors
     filter:
       - '*.mcpb'
+  # The same server, run by Claude Code with Kificut's executable (Settings > Claude > Connect Claude Code).
+  - from: connectors/claude/build/server/index.js
+    to: connectors/kificut-mcp.js
 
 fileAssociations:
   - ext: kificut
@@ -79,4 +82,10 @@ linux:
     - AppImage
   artifactName: ${productName}-${version}-linux-${arch}.${ext}
 
-publish: null
+# Writes app-update.yml into the app and latest.yml next to the Windows installer, which the
+# in-app updater reads from the GitHub release. CI builds with --publish never and attaches the
+# files itself.
+publish:
+  provider: github
+  owner: Kificut-app
+  repo: kificut

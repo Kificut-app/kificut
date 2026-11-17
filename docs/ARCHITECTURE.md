@@ -82,6 +82,16 @@ Claude Desktop -- stdio (MCP) --> connector (connectors/claude) -- TCP 127.0.0.1
 
 To add a tool, define it in `ai-tools.ts`, implement it in `ai/tools.ts` (a test checks both lists match), and rebuild the connector with `npm run build:connector`.
 
+## Updates and recovery
+
+- **Updates** (`src/main/updater.ts`): on Windows (and Linux AppImage) electron-updater reads `latest.yml` from the newest published GitHub release, downloads the installer in the background, checks its SHA-512 and installs it on Restart to Update or on quit. electron-builder writes `app-update.yml` into the app because of the `publish` section in `electron-builder.yml`; CI builds with `--publish never` and attaches `latest.yml` and the blockmap to the draft release. macOS only lets an app replace itself when it is signed with an Apple Developer ID, so there Kificut reads the latest release from the GitHub API, downloads the DMG for the Mac's architecture through `download.ts` (verified against the SHA-256 GitHub publishes), and opens it. Once releases are signed, the Mac can move to electron-updater too (CI would need to merge the two `latest-mac.yml` files).
+- **Recovery** (`src/main/recovery.ts`, `lib/recovery.ts`): while the project has unsaved changes the renderer writes it to `recovery.json` after a short pause, and removes the file when the project is saved, closed or discarded. Before an update installs, the copy is marked `update` and the writer is frozen; at the next start an `update` copy is restored without asking and any other copy is offered.
+- **Testing**: `KIFICUT_UPDATE_FEED` points electron-updater at a generic feed (a folder with `latest*.yml` and the installer) and `KIFICUT_RELEASES_API` replaces the GitHub API URL, so the flow can be tried against a local server.
+
+## Claude Code
+
+`src/main/claude-code.ts` registers the same MCP server the Desktop bundle uses (shipped unpacked as `resources/connectors/kificut-mcp.js`). It runs with Kificut's own executable and `ELECTRON_RUN_AS_NODE=1`, so no separate Node.js is needed, and the connector removes that variable before it starts Kificut itself. The `claude` command is looked up on PATH, in the usual install folders and inside the VS Code, Cursor and Windsurf extensions, then `claude mcp add kificut ... --scope user` is run after removing any older entry.
+
 ## Local AI models
 
 Kokoro (text to speech) and Whisper (speech to text) run in a module worker in the renderer (`src/renderer/src/local-ai/worker.ts`) with transformers.js and ONNX Runtime Web.

@@ -28,10 +28,10 @@
     "format": "prettier --write .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "dist": "npm run build && electron-builder",
-    "dist:win": "npm run build && electron-builder --win",
-    "dist:mac": "npm run build && electron-builder --mac",
-    "dist:linux": "npm run build && electron-builder --linux",
+    "dist": "npm run build && electron-builder --publish never",
+    "dist:win": "npm run build && electron-builder --win --publish never",
+    "dist:mac": "npm run build && electron-builder --mac --publish never",
+    "dist:linux": "npm run build && electron-builder --linux --publish never",
     "brand:sound": "node scripts/brand-sound.mjs",
     "build:connector": "node scripts/build-connector.mjs"
   },
@@ -65,5 +65,8 @@
     "vitest": "^4.1.12",
     "zod": "^4.6.7",
     "zustand": "^5.1.0"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.11"
   }
 }

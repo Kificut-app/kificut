@@ -1,6 +1,6 @@
 import { createHash, type Hash } from 'node:crypto'
-import { createWriteStream, type WriteStream } from 'node:fs'
-import { mkdir, rename, rm } from 'node:fs/promises'
+import { createReadStream, createWriteStream, type WriteStream } from 'node:fs'
+import { mkdir, rename, rm, stat } from 'node:fs/promises'
 import { dirname } from 'node:path'
 
 /*
@@ -70,6 +70,15 @@ export function startHash(target: Pick<DownloadTarget, 'kind' | 'size'>): Hash {
   const hash = createHash(target.kind === 'sha256' ? 'sha256' : 'sha1')
   if (target.kind === 'git-blob') hash.update(`blob ${target.size}\0`)
   return hash
+}
+
+/** True when the file is already on disk with the right size and hash. */
+export async function fileMatches(target: DownloadTarget): Promise<boolean> {
+  const info = await stat(target.dest).catch(() => null)
+  if (!info || info.size !== target.size) return false
+  const hash = startHash(target)
+  for await (const chunk of createReadStream(target.dest)) hash.update(chunk as Buffer)
+  return hash.digest('hex') === target.digest
 }
 
 function finish(out: WriteStream): Promise<void> {

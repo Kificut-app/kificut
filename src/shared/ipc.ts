@@ -2,6 +2,7 @@ import type { ExportProgress, ExportResult, ExportSettings } from './export-form
 import type { OverlayImage } from './ffmpeg-graph'
 import type { ToolResult } from './ai-tools'
 import type { ModelStatus } from './models'
+import type { RecoverySnapshot, UpdateStatus } from './updates'
 import type { AssistantEvent, AssistantSettings, ProviderId, ProviderUpdate } from './assistant'
 import type {
   AiStatus,
@@ -48,6 +49,12 @@ export type MenuCommand =
   | 'preferences'
   | 'shortcuts'
   | 'about'
+  | 'check-updates'
+
+export type ClaudeCodeResult =
+  | { ok: true }
+  /** The command to run by hand, when the claude command was not found or failed. */
+  | { ok: false; reason: 'not-found' | 'failed'; command: string; error?: string }
 
 export interface OpenedProject {
   path: string
@@ -108,6 +115,21 @@ export interface KificutApi {
     onStatus(callback: (status: ModelStatus) => void): () => void
   }
 
+  updates: {
+    status(): Promise<UpdateStatus>
+    /** Checks now and reports the result even when there is nothing new. */
+    check(): Promise<UpdateStatus>
+    /** Closes Kificut and installs the downloaded update. Save a recovery copy first. */
+    install(): Promise<void>
+    onStatus(callback: (status: UpdateStatus) => void): () => void
+  }
+
+  recovery: {
+    save(snapshot: RecoverySnapshot): Promise<void>
+    read(): Promise<RecoverySnapshot | null>
+    clear(): Promise<void>
+  }
+
   assistant: {
     settings(): Promise<AssistantSettings>
     updateProvider(update: ProviderUpdate): Promise<AssistantSettings>
@@ -132,6 +154,8 @@ export interface KificutApi {
     onStatus(callback: (status: AiStatus) => void): () => void
     /** Opens the bundled Claude Desktop connector so Claude Desktop installs it. */
     installClaude(): Promise<{ ok: boolean; error?: string }>
+    /** Registers Kificut with Claude Code through its `claude mcp add` command. */
+    connectClaudeCode(): Promise<ClaudeCodeResult>
   }
 
   project: {
@@ -216,6 +240,14 @@ export const IPC = {
   modelsCancel: 'models:cancel',
   modelsRemove: 'models:remove',
   modelsStatus: 'models:status',
+  updatesStatus: 'updates:status',
+  updatesGet: 'updates:get',
+  updatesCheck: 'updates:check',
+  updatesInstall: 'updates:install',
+  recoverySave: 'recovery:save',
+  recoveryRead: 'recovery:read',
+  recoveryClear: 'recovery:clear',
+  aiConnectClaudeCode: 'ai:connect-claude-code',
   assistantSettings: 'assistant:settings',
   assistantUpdateProvider: 'assistant:update-provider',
   assistantSetActive: 'assistant:set-active',

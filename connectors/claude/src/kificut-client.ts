@@ -104,7 +104,14 @@ export class KificutClient {
     if (!previous?.launch) {
       throw new Error('Kificut is not running. Ask the user to open Kificut, then try again.')
     }
-    const child = spawn(previous.launch.command, previous.launch.args, { detached: true, stdio: 'ignore' })
+    // Claude Code runs this server with Kificut's executable in Node mode; the app itself must not inherit that.
+    const env = { ...process.env }
+    delete env.ELECTRON_RUN_AS_NODE
+    const child = spawn(previous.launch.command, previous.launch.args, {
+      detached: true,
+      stdio: 'ignore',
+      env
+    })
     child.on('error', () => undefined)
     child.unref()
     const deadline = Date.now() + LAUNCH_WAIT_MS

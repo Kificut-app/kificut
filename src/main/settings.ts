@@ -12,7 +12,8 @@ const DEFAULTS: AppSettings = {
   previewScale: 1,
   showWaveforms: true,
   showThumbnails: true,
-  connectorEnabled: true
+  connectorEnabled: true,
+  autoUpdate: true
 }
 
 const MAX_RECENT = 12

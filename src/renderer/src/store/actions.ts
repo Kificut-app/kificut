@@ -143,7 +143,10 @@ export async function requestCloseProject(): Promise<void> {
 }
 
 export async function handleWindowClose(): Promise<void> {
-  if (await confirmDiscardChanges()) window.kificut.app.closeWindow(true)
+  if (!(await confirmDiscardChanges())) return
+  // Saved or deliberately discarded, so there is nothing to recover next time.
+  await window.kificut.recovery.clear()
+  window.kificut.app.closeWindow(true)
 }
 
 export function renameProject(name: string): void {

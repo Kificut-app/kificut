@@ -3,12 +3,21 @@ import { isDirty, useEditor } from '../store/editor'
 import { handleWindowClose, openProjectPath, saveProject, setProxyStatus } from '../store/actions'
 import { startModelSync } from '../store/models'
 import { startAssistantSync } from '../store/assistant'
+import { startUpdateSync } from '../store/updates'
+import { offerRecovery, startRecoveryWriter } from '../lib/recovery'
 
 /** Wires the renderer to the main process: settings, proxies, window title, close requests and autosave. */
 export function useBoot(): void {
   useEffect(() => {
     startModelSync()
     startAssistantSync()
+    startUpdateSync()
+    // Read any recovered work before the writer starts, so it is not cleared first.
+    let stopRecovery: (() => void) | null = null
+    let unmounted = false
+    void offerRecovery().finally(() => {
+      if (!unmounted) stopRecovery = startRecoveryWriter()
+    })
     void window.kificut.settings.get().then((settings) => {
       useEditor.setState({ settings, previewScale: settings.previewScale || 1 })
     })
@@ -35,6 +44,8 @@ export function useBoot(): void {
       offClose()
       offOpen()
       offStore()
+      unmounted = true
+      stopRecovery?.()
     }
   }, [])
 

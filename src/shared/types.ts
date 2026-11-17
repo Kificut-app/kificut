@@ -162,6 +162,8 @@ export interface AppSettings {
   showThumbnails: boolean
   /** Lets AI assistants such as Claude edit through the local connector. */
   connectorEnabled: boolean
+  /** Checks for new versions in the background and downloads them. */
+  autoUpdate: boolean
 }
 
 export interface BinaryInfo {
