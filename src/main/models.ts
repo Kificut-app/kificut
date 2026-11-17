@@ -81,7 +81,11 @@ export async function modelStatus(id: string): Promise<ModelStatus> {
       model.extras.map((e) => stat(join(modelsDir(), e.path)).catch(() => null))
     )
     if (extras.every(Boolean)) {
-      const size = (await folderSize(repoDir(model))) + extras.reduce((sum, s) => sum + (s?.size ?? 0), 0)
+      // Extras stored inside the model's own folder are already counted.
+      const outside = model.extras
+        .map((e, i) => (e.path.startsWith(`${model.repo}/`) ? 0 : (extras[i]?.size ?? 0)))
+        .reduce((sum, n) => sum + n, 0)
+      const size = (await folderSize(repoDir(model))) + outside
       return { id, state: 'installed', received: 0, total: 0, size }
     }
   }
@@ -103,10 +107,14 @@ function fetchJson<T>(url: string, signal: AbortSignal): Promise<T> {
 }
 
 async function plan(model: LocalModelInfo, signal: AbortSignal): Promise<PlannedFile[]> {
-  const tree = await fetchJson<TreeEntry[]>(
-    `https://huggingface.co/api/models/${model.repo}/tree/${model.revision}?recursive=true`,
-    signal
-  )
+  // Models from elsewhere come only as pinned extras.
+  const tree =
+    model.files.length === 0
+      ? []
+      : await fetchJson<TreeEntry[]>(
+          `https://huggingface.co/api/models/${model.repo}/tree/${model.revision}?recursive=true`,
+          signal
+        )
   const byPath = new Map(tree.filter((e) => e.type === 'file').map((e) => [e.path, e]))
   const files: PlannedFile[] = model.files.map((path) => {
     const entry = byPath.get(path)

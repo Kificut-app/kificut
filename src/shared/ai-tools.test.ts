@@ -30,6 +30,7 @@ describe('AI tool definitions', () => {
     expect(readOnly.sort()).toEqual(
       [
         'analyze_media',
+        'find_shots',
         'get_export_status',
         'get_project',
         'inspect_media',

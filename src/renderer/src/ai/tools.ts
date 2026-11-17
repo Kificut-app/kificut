@@ -44,9 +44,13 @@ import { defaultColor, defaultTransform, TEXT_PRESETS, uid } from '../lib/factor
 import { DEFAULT_VOICE, getLocalModel, LOCAL_MODELS, type ModelStatus } from '@shared/models'
 import {
   captionsForClip,
+  cleanAudio,
   createVoiceover,
+  cutoutImage,
+  findShots,
   ModelMissingError,
   modelName,
+  removeVideoBackground,
   transcribeMedia
 } from '../local-ai/features'
 import { player } from '../engine/player'
@@ -1028,9 +1032,15 @@ const tools: Record<string, Tool> = {
   async transcribe_media(args) {
     const project = requireProject()
     const media = requireMedia(project, string(args, 'media_id', true))
-    const transcript = await transcribeMedia(media, string(args, 'language') ?? null)
+    const translate = bool(args, 'translate_to_english') ?? false
+    const transcript = await transcribeMedia(
+      media,
+      string(args, 'language') ?? null,
+      undefined,
+      translate ? 'translate' : 'transcribe'
+    )
     return json(
-      `Transcribed ${media.name} with ${modelName(transcript.modelId)}: ${transcript.segments.length} segments. Times are seconds in the source file.`,
+      `${translate ? 'Translated' : 'Transcribed'} ${media.name} with ${modelName(transcript.modelId)}: ${transcript.segments.length} segments. Times are seconds in the source file.`,
       {
         language: transcript.language,
         segments: transcript.segments.map((s) => ({ start: r3(s.start), end: r3(s.end), text: s.text }))
@@ -1049,7 +1059,13 @@ const tools: Record<string, Tool> = {
     if (preset !== 'subtitle' && preset !== 'caption')
       throw new ToolError('"preset" must be subtitle or caption.')
     const trackName = string(args, 'track')
-    const transcript = await transcribeMedia(media, string(args, 'language') ?? null)
+    const translate = bool(args, 'translate_to_english') ?? false
+    const transcript = await transcribeMedia(
+      media,
+      string(args, 'language') ?? null,
+      undefined,
+      translate ? 'translate' : 'transcribe'
+    )
     const fps = project.settings.fps
     const cues = captionsForClip(clip, transcript.segments, Math.max(0.5, 2 / fps))
     if (cues.length === 0) throw new ToolError('No speech was found in that clip.')
@@ -1142,6 +1158,101 @@ const tools: Record<string, Tool> = {
     } finally {
       off()
     }
+  },
+
+  async find_shots(args) {
+    const project = requireProject()
+    const query = string(args, 'query', true)!
+    const limit = Math.round(number(args, 'limit', { min: 1, max: 30 }) ?? 8)
+    const wanted = args.media_ids
+    let media = project.media
+    if (wanted !== undefined) {
+      if (!Array.isArray(wanted)) throw new ToolError('"media_ids" must be a list of media ids.')
+      media = wanted.map((id) => requireMedia(project, String(id)))
+    }
+    if (!media.some((m) => m.hasVideo))
+      throw new ToolError('There is no video or picture to search. Import some first.')
+    const shots = await findShots(query, media, limit)
+    if (shots.length === 0) return text(`Nothing in the footage looks like "${query}".`)
+    return json(
+      `${shots.length} moments that look like "${query}", best first. Times are seconds in the source file; pass them to add_clips as in and out.`,
+      shots.map((shot) => ({
+        media_id: shot.media.id,
+        media: shot.media.name,
+        ...(shot.media.kind === 'image'
+          ? {}
+          : { in: r1(shot.start), out: r1(Math.max(shot.end, shot.start + 1)) }),
+        best_frame: r1(shot.time),
+        score: Math.round(shot.score * 1000) / 1000
+      }))
+    )
+  },
+
+  async reduce_noise(args) {
+    const project = requireProject()
+    const clip = requireClip(project, string(args, 'clip_id', true))
+    const strength = number(args, 'strength', { min: 0.1, max: 1 }) ?? 0.85
+    const targets =
+      clip.kind === 'audio'
+        ? [clip]
+        : project.clips.filter((c) => c.kind === 'audio' && clip.linkId && c.linkId === clip.linkId)
+    if (targets.length === 0 || !targets[0].mediaId) {
+      throw new ToolError('Noise reduction works on an audio clip, or a video clip with linked audio.')
+    }
+    const source = requireMedia(project, targets[0].mediaId)
+    const path = await cleanAudio(source, strength)
+    const [cleanMedia] = await importPaths([path])
+    if (!cleanMedia) throw new ToolError('The cleaned audio was saved but could not be imported.')
+    commit((draft) => {
+      for (const target of targets) {
+        const c = draft.clips.find((x) => x.id === target.id)
+        if (c && c.mediaId === source.id) {
+          c.mediaId = cleanMedia.id
+          c.name = cleanMedia.name
+        }
+      }
+    })
+    return text(
+      `Reduced the background noise in ${source.name}. The clip now plays ${cleanMedia.name}, saved at ${path}.`
+    )
+  },
+
+  async remove_background(args) {
+    const project = requireProject()
+    const clip = requireClip(project, string(args, 'clip_id', true))
+    if (!clip.mediaId || (clip.kind !== 'image' && clip.kind !== 'video')) {
+      throw new ToolError('Background removal works on picture and video clips.')
+    }
+    const source = requireMedia(project, clip.mediaId)
+    if (clip.kind === 'image') {
+      const path = await cutoutImage(source)
+      const [cutout] = await importPaths([path])
+      if (!cutout) throw new ToolError('The cut-out was saved but could not be imported.')
+      commit((draft) => {
+        const c = draft.clips.find((x) => x.id === clip.id)
+        if (c) {
+          c.mediaId = cutout.id
+          c.name = cutout.name
+        }
+      })
+      return text(`Removed the background from ${source.name}. The clip now shows ${cutout.name}.`)
+    }
+    // Only the part of the video the clip uses is processed; the new file starts there.
+    const used = clip.duration * clip.speed
+    const path = await removeVideoBackground(source, clip.inPoint, used)
+    const [cutout] = await importPaths([path])
+    if (!cutout) throw new ToolError('The video was saved but could not be imported.')
+    commit((draft) => {
+      const c = draft.clips.find((x) => x.id === clip.id)
+      if (c) {
+        c.mediaId = cutout.id
+        c.name = cutout.name
+        c.inPoint = 0
+      }
+    })
+    return text(
+      `Removed the background from ${r1(used)}s of ${source.name}. The clip now plays ${cutout.name}, which has transparency, so tracks below show through.`
+    )
   },
 
   get_export_status() {

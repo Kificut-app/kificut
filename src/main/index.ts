@@ -26,6 +26,17 @@ import { registerAssistantIpc } from './assistant'
 import { checkForUpdates, installUpdate, startUpdater, updateStatus } from './updater'
 import { clearRecovery, readRecovery, saveRecovery } from './recovery'
 import { connectClaudeCode } from './claude-code'
+import {
+  cancelMatte,
+  finishMatte,
+  readMatteFrames,
+  readSearchIndex,
+  reduceNoise,
+  searchFrames,
+  startMatte,
+  writeMatteMasks,
+  writeSearchIndex
+} from './ai-media'
 import type { RecoverySnapshot } from '@shared/updates'
 import {
   announceConnectorDisabled,
@@ -225,6 +236,28 @@ function registerIpc(): void {
   ipcMain.handle(IPC.recoveryRead, () => readRecovery())
   ipcMain.handle(IPC.recoveryClear, () => clearRecovery())
   ipcMain.handle(IPC.aiConnectClaudeCode, () => connectClaudeCode())
+
+  ipcMain.handle(IPC.localAiSearchFrames, (_event, path: string, duration: number) =>
+    searchFrames(path, duration)
+  )
+  ipcMain.handle(IPC.localAiReadIndex, (_event, path: string, model: string) => readSearchIndex(path, model))
+  ipcMain.handle(IPC.localAiWriteIndex, (_event, path: string, model: string, data: string) =>
+    writeSearchIndex(path, model, data)
+  )
+  ipcMain.handle(IPC.localAiReduceNoise, (event, path: string, strength: number, duration: number) =>
+    reduceNoise(path, strength, duration, (fraction) => {
+      if (!event.sender.isDestroyed()) event.sender.send(IPC.localAiNoiseProgress, path, fraction)
+    })
+  )
+  ipcMain.handle(
+    IPC.localAiStartMatte,
+    (_event, path: string, start: number, duration: number, fps: number, width: number, height: number) =>
+      startMatte(path, start, duration, fps, width, height)
+  )
+  ipcMain.handle(IPC.localAiReadFrames, (_event, id: number, max: number) => readMatteFrames(id, max))
+  ipcMain.handle(IPC.localAiWriteMasks, (_event, id: number, masks: Uint8Array) => writeMatteMasks(id, masks))
+  ipcMain.handle(IPC.localAiFinishMatte, (_event, id: number) => finishMatte(id))
+  ipcMain.handle(IPC.localAiCancelMatte, (_event, id: number) => cancelMatte(id))
 
   ipcMain.handle(IPC.aiStatus, () => connectorStatus(isConnectorRunning()))
   ipcMain.handle(IPC.aiInstallClaude, async () => {

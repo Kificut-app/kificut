@@ -5,7 +5,7 @@
  * otherwise), so nothing leaves the computer.
  */
 
-export type ModelTask = 'voiceover' | 'transcription'
+export type ModelTask = 'voiceover' | 'transcription' | 'noise' | 'search' | 'background'
 
 /** A file fetched from somewhere other than the model repository, with a pinned hash. */
 export interface ExtraFile {
@@ -24,9 +24,16 @@ export interface LocalModelInfo {
   license: string
   /** Approximate download size in bytes, for display before the file list is fetched. */
   approximateSize: number
+  /** Hugging Face repository, or for models from elsewhere the folder they are stored in. */
   repo: string
+  /** Hugging Face commit, or the git commit the extras are pinned to. */
   revision: string
+  /** Files to fetch from the Hugging Face repository at that revision. Empty for models from elsewhere. */
   files: string[]
+  /** For tasks with several models, which one is preferred when more than one is installed. */
+  rank?: number
+  /** Precision to load the ONNX weights at, matching the file in `files`. */
+  dtype?: string
   extras: ExtraFile[]
   homepage: string
 }
@@ -84,6 +91,18 @@ export const DEFAULT_VOICE = 'af_heart'
  */
 export const PHONEMIZER_PATH = 'phonemizer/phonemizer-1.2.1.js'
 
+/** Where the RNNoise speech model lives in the models folder. FFmpeg's arnndn filter reads it. */
+export const RNNOISE_FOLDER = 'rnnoise/somnolent-hogwash'
+export const RNNOISE_FILE = 'sh.rnnn'
+
+export const TASK_LABELS: Record<ModelTask, string> = {
+  voiceover: 'Voiceover',
+  transcription: 'Speech to text',
+  noise: 'Audio cleanup',
+  search: 'Footage search',
+  background: 'Background removal'
+}
+
 const WHISPER_FILES = [
   'config.json',
   'generation_config.json',
@@ -128,6 +147,7 @@ export const LOCAL_MODELS: LocalModelInfo[] = [
   },
   {
     id: 'whisper-base',
+    rank: 1,
     name: 'Whisper Base',
     task: 'transcription',
     description: 'Fast speech to text in about 100 languages. Good for captions and finding what was said.',
@@ -141,6 +161,7 @@ export const LOCAL_MODELS: LocalModelInfo[] = [
   },
   {
     id: 'whisper-small',
+    rank: 2,
     name: 'Whisper Small',
     task: 'transcription',
     description: 'More accurate speech to text than Base, at about three times the size and time.',
@@ -151,8 +172,92 @@ export const LOCAL_MODELS: LocalModelInfo[] = [
     files: WHISPER_FILES,
     extras: [],
     homepage: 'https://huggingface.co/openai/whisper-small'
+  },
+  {
+    id: 'rnnoise-speech',
+    name: 'RNNoise',
+    task: 'noise',
+    description:
+      'Cleans up speech recorded with steady background noise such as fans, air conditioning, hum and computers.',
+    license: 'Public domain',
+    approximateSize: 297_646,
+    repo: 'rnnoise/somnolent-hogwash',
+    revision: '3eee541a283fd3b8f81b85b1748e3b9ccbefa04d',
+    files: [],
+    extras: [
+      {
+        url: 'https://raw.githubusercontent.com/GregorR/rnnoise-models/3eee541a283fd3b8f81b85b1748e3b9ccbefa04d/somnolent-hogwash-2018-09-01/sh.rnnn',
+        path: `${RNNOISE_FOLDER}/${RNNOISE_FILE}`,
+        sha256: '70bb6685eb0c2a1d18e2918dca3fbfbd39317010b1802eb1b6ea73a92f3fdec0',
+        size: 297_646
+      }
+    ],
+    homepage: 'https://github.com/GregorR/rnnoise-models'
+  },
+  {
+    id: 'clip-base',
+    name: 'CLIP',
+    task: 'search',
+    description:
+      'Finds moments in your footage from a description, such as "sunset over the sea" or "a dog running".',
+    license: 'MIT',
+    approximateSize: 157_000_000,
+    repo: 'Xenova/clip-vit-base-patch32',
+    revision: '6b7c523703ae26e39be4b03774966f8571c7f523',
+    files: [
+      'config.json',
+      'preprocessor_config.json',
+      'tokenizer.json',
+      'tokenizer_config.json',
+      'special_tokens_map.json',
+      'vocab.json',
+      'merges.txt',
+      'onnx/text_model_quantized.onnx',
+      'onnx/vision_model_quantized.onnx'
+    ],
+    extras: [],
+    homepage: 'https://huggingface.co/openai/clip-vit-base-patch32'
+  },
+  {
+    id: 'modnet',
+    name: 'MODNet',
+    task: 'background',
+    rank: 1,
+    dtype: 'fp32',
+    description: 'Removes the background behind people. Small and quick enough for video clips.',
+    license: 'Apache-2.0',
+    approximateSize: 25_889_000,
+    repo: 'Xenova/modnet',
+    revision: 'fa2fa546052fba4c08921230a26cc69a333fca12',
+    files: ['config.json', 'preprocessor_config.json', 'onnx/model.onnx'],
+    extras: [],
+    homepage: 'https://github.com/ZHKKKe/MODNet'
+  },
+  {
+    id: 'ormbg',
+    name: 'ORMBG',
+    task: 'background',
+    rank: 2,
+    dtype: 'q8',
+    description: 'Cuts out any subject in a picture, such as products, logos or pets.',
+    license: 'Apache-2.0',
+    approximateSize: 44_316_000,
+    repo: 'onnx-community/ormbg-ONNX',
+    revision: '034e2d884afbab897e10e78fc5bb566b29533fd6',
+    files: ['config.json', 'preprocessor_config.json', 'onnx/model_quantized.onnx'],
+    extras: [],
+    homepage: 'https://github.com/schirrmacher/ormbg'
   }
 ]
+
+/** The installed model for a task, preferring the higher ranked one. */
+export function bestInstalled(task: ModelTask, installed: (id: string) => boolean): LocalModelInfo | null {
+  return (
+    LOCAL_MODELS.filter((m) => m.task === task && installed(m.id)).sort(
+      (a, b) => (b.rank ?? 0) - (a.rank ?? 0)
+    )[0] ?? null
+  )
+}
 
 export function getLocalModel(id: string): LocalModelInfo | undefined {
   return LOCAL_MODELS.find((m) => m.id === id)

@@ -66,17 +66,63 @@ class LocalEngine {
     modelId: string,
     audio: Float32Array,
     language: string | null,
-    onStatus?: (message: string) => void
+    onStatus?: (message: string) => void,
+    task: 'transcribe' | 'translate' = 'transcribe'
   ): Promise<Transcript> {
     const model = getLocalModel(modelId)
     if (!model) throw new Error('Unknown speech recognition model.')
     const response = await this.send(
-      { type: 'transcribe', modelId, repo: model.repo, audio, language },
+      { type: 'transcribe', modelId, repo: model.repo, audio, language, task },
       onStatus,
       [audio.buffer]
     )
     if (response.type !== 'transcribe') throw new Error('Unexpected reply from the speech model.')
     return { modelId, language: response.language, segments: response.segments }
+  }
+
+  async embedText(repo: string, texts: string[]): Promise<{ vectors: Float32Array; dim: number }> {
+    const response = await this.send({ type: 'embed-text', repo, texts })
+    if (response.type !== 'embeddings') throw new Error('Unexpected reply from the search model.')
+    return { vectors: response.vectors, dim: response.dim }
+  }
+
+  async embedFrames(
+    repo: string,
+    frames: Uint8Array,
+    width: number,
+    height: number,
+    onStatus?: (message: string) => void
+  ): Promise<{ vectors: Float32Array; dim: number }> {
+    const response = await this.send({ type: 'embed-frames', repo, frames, width, height }, onStatus, [
+      frames.buffer
+    ])
+    if (response.type !== 'embeddings') throw new Error('Unexpected reply from the search model.')
+    return { vectors: response.vectors, dim: response.dim }
+  }
+
+  async cutout(
+    repo: string,
+    dtype: string,
+    image: Blob,
+    onStatus?: (message: string) => void
+  ): Promise<ArrayBuffer> {
+    const response = await this.send({ type: 'cutout', repo, dtype, image }, onStatus)
+    if (response.type !== 'cutout') throw new Error('Unexpected reply from the background model.')
+    return response.png
+  }
+
+  async matte(
+    repo: string,
+    dtype: string,
+    frames: Uint8Array,
+    width: number,
+    height: number
+  ): Promise<Uint8Array> {
+    const response = await this.send({ type: 'matte', repo, dtype, frames, width, height }, undefined, [
+      frames.buffer
+    ])
+    if (response.type !== 'masks') throw new Error('Unexpected reply from the background model.')
+    return response.masks
   }
 }
 

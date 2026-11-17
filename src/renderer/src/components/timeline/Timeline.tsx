@@ -30,8 +30,8 @@ import {
   updateTrack,
   zoomBy
 } from '../../store/actions'
-import { openMenu } from '../../store/ui'
-import { generateCaptions } from '../../local-ai/commands'
+import { openMenu, type MenuEntry } from '../../store/ui'
+import { generateCaptions, reduceNoise, removeBackground } from '../../local-ai/commands'
 import { uid, defaultTransform } from '../../lib/factory'
 import {
   clipEnd,
@@ -98,6 +98,31 @@ interface DropPreview {
   trackId: string | null
   start: number
   duration: number
+}
+
+/** AI actions for a clip: captions, noise reduction and background removal. */
+function aiMenuItems(clip: Clip, count: number): MenuEntry[] {
+  const single = count === 1 && Boolean(clip.mediaId)
+  const project = useEditor.getState().project
+  const media = project?.media.find((m) => m.id === clip.mediaId)
+  const speech = single && (clip.kind === 'video' || clip.kind === 'audio') && Boolean(media?.hasAudio)
+  const linkedAudio =
+    clip.kind === 'audio' ||
+    Boolean(clip.linkId && project?.clips.some((c) => c.kind === 'audio' && c.linkId === clip.linkId))
+  return [
+    { label: 'Generate Captions', disabled: !speech, run: () => void generateCaptions(clip.id) },
+    {
+      label: 'Generate English Captions',
+      disabled: !speech,
+      run: () => void generateCaptions(clip.id, true)
+    },
+    { label: 'Reduce Noise', disabled: !single || !linkedAudio, run: () => void reduceNoise(clip.id) },
+    {
+      label: 'Remove Background',
+      disabled: !single || (clip.kind !== 'video' && clip.kind !== 'image') || Boolean(media?.alpha),
+      run: () => void removeBackground(clip.id, clip.kind === 'video')
+    }
+  ]
 }
 
 export function Timeline() {
@@ -450,11 +475,6 @@ export function Timeline() {
         ? { label: 'Unlink', run: unlinkSelection }
         : { label: 'Link', disabled: count < 2, run: linkSelection },
       {
-        label: 'Generate Captions',
-        disabled: count !== 1 || !clip.mediaId || (clip.kind !== 'video' && clip.kind !== 'audio'),
-        run: () => void generateCaptions(clip.id)
-      },
-      {
         label: 'Reset Transform',
         disabled: clip.kind === 'audio',
         run: () =>
@@ -462,6 +482,8 @@ export function Timeline() {
             c.transform = defaultTransform()
           })
       },
+      { separator: true },
+      ...aiMenuItems(clip, count),
       { separator: true },
       { label: 'Delete', shortcut: deleteKey, danger: true, run: () => deleteSelection(false) },
       {

@@ -1,6 +1,16 @@
-import { useEffect, useState } from 'react'
-import { AudioLines, Captions, CircleAlert, CircleCheck, ExternalLink, KeyRound } from 'lucide-react'
-import { LOCAL_MODELS, type LocalModelInfo } from '@shared/models'
+import { Fragment, useEffect, useState } from 'react'
+import {
+  AudioLines,
+  AudioWaveform,
+  Captions,
+  CircleAlert,
+  CircleCheck,
+  ExternalLink,
+  KeyRound,
+  ScanSearch,
+  UserRoundX
+} from 'lucide-react'
+import { LOCAL_MODELS, TASK_LABELS, type LocalModelInfo, type ModelTask } from '@shared/models'
 import { getProvider, PROVIDERS, type AssistantSettings, type ProviderId } from '@shared/assistant'
 import { setDialog } from '../../store/editor'
 import { errorText } from '../../store/actions'
@@ -38,20 +48,38 @@ export function AiDialog() {
 
 /* Local models */
 
+/** Where each kind of model shows up in Kificut. */
+const TASK_USES: Record<ModelTask, string> = {
+  voiceover: 'The Voice tab in the media panel.',
+  transcription: 'Generate Captions in the clip menu, and transcripts for assistants.',
+  noise: 'Reduce Noise in the clip menu.',
+  search: 'Search inside footage in the media panel.',
+  background: 'Remove Background in the clip menu.'
+}
+
+const TASK_ICONS = {
+  voiceover: AudioLines,
+  transcription: Captions,
+  noise: AudioWaveform,
+  search: ScanSearch,
+  background: UserRoundX
+} satisfies Record<ModelTask, unknown>
+
 function LocalModels() {
   return (
     <div className="ai-dialog__section">
       <p className="settings__note">
         These models run on your computer, so your footage and scripts stay private and they work offline once
-        installed. Files come from Hugging Face and are checked against their published hashes.
+        installed. Install only what you need; each download is pinned and checked against its published hash.
       </p>
-      <h3 className="settings__heading">Voiceover</h3>
-      {LOCAL_MODELS.filter((m) => m.task === 'voiceover').map((m) => (
-        <ModelRow key={m.id} model={m} />
-      ))}
-      <h3 className="settings__heading">Speech to text</h3>
-      {LOCAL_MODELS.filter((m) => m.task === 'transcription').map((m) => (
-        <ModelRow key={m.id} model={m} />
+      {(Object.keys(TASK_LABELS) as ModelTask[]).map((task) => (
+        <Fragment key={task}>
+          <h3 className="settings__heading">{TASK_LABELS[task]}</h3>
+          <p className="ai-dialog__use">{TASK_USES[task]}</p>
+          {LOCAL_MODELS.filter((m) => m.task === task).map((m) => (
+            <ModelRow key={m.id} model={m} />
+          ))}
+        </Fragment>
       ))}
       <p className="ai-dialog__fine">
         Kokoro turns text into sounds with eSpeak NG, which is licensed under the GPL. It is downloaded
@@ -65,7 +93,7 @@ function ModelRow({ model }: { model: LocalModelInfo }) {
   const status = useModels((s) => s[model.id])
   const state = status?.state ?? 'not-installed'
   const percent = status && status.total > 0 ? Math.min(100, (status.received / status.total) * 100) : 0
-  const Icon = model.task === 'voiceover' ? AudioLines : Captions
+  const Icon = TASK_ICONS[model.task]
 
   return (
     <div className="model-row">

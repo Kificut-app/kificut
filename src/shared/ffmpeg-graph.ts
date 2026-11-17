@@ -275,10 +275,17 @@ export function buildRenderPlan(job: RenderJob): RenderPlan {
               num(ranged.inPoint),
               '-t',
               num(ranged.duration * clip.speed),
+              // FFmpeg's built-in VP8/VP9 decoders drop the alpha channel; libvpx keeps it.
+              ...(item.alpha ? ['-c:v', item.videoCodec === 'vp8' ? 'libvpx' : 'libvpx-vp9'] : []),
               '-i',
               item.path
             ])
-            source = { input: `[${index}:v]`, width: item.width, height: item.height, alpha: false }
+            source = {
+              input: `[${index}:v]`,
+              width: item.width,
+              height: item.height,
+              alpha: Boolean(item.alpha)
+            }
           } else {
             const index = addInput([
               '-loop',

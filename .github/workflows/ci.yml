@@ -104,6 +104,15 @@ jobs:
             test -f release/*/win-unpacked/resources/bin/ffmpeg.exe
             test -f release/*/win-unpacked/resources/bin/ffprobe.exe
           fi
+          # Noise reduction needs the arnndn filter, and background removal for video needs libvpx.
+          if [ "$RUNNER_OS" = "macOS" ]; then ffmpeg="$app/Contents/Resources/bin/ffmpeg"; else ffmpeg=$(ls release/*/win-unpacked/resources/bin/ffmpeg.exe); fi
+          if "$ffmpeg" -version > /dev/null 2>&1; then
+            "$ffmpeg" -hide_banner -filters | grep -q ' arnndn ' || { echo "::error::FFmpeg has no arnndn filter"; exit 1; }
+            "$ffmpeg" -hide_banner -encoders | grep -q ' libvpx-vp9 ' || { echo "::error::FFmpeg has no libvpx-vp9 encoder"; exit 1; }
+            "$ffmpeg" -hide_banner -decoders | grep -q ' libvpx-vp9 ' || { echo "::error::FFmpeg has no libvpx-vp9 decoder"; exit 1; }
+          else
+            echo "::warning::Could not run the bundled FFmpeg on this runner to check its filters"
+          fi
       - uses: actions/upload-artifact@v7
         with:
           name: kificut-${{ matrix.id }}

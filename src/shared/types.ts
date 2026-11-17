@@ -20,6 +20,8 @@ export interface MediaItem {
   audioCodec: string | null
   container: string
   size: number
+  /** Video with a transparency channel (VP8/VP9 WebM with alpha), such as a clip with its background removed. */
+  alpha?: boolean
 }
 
 export interface Transform {

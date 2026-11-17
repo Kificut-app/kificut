@@ -4,6 +4,17 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.3.0]
+
+More local AI models for editing: noise reduction, footage search and background removal.
+
+### Added
+
+- More models to install, each with a feature: RNNoise for Reduce Noise on dialogue, CLIP to search inside footage by description, and MODNet and ORMBG for Remove Background on pictures and on people in video
+- Generate English Captions, which translates speech in other languages with Whisper
+- Video with transparency (VP8 or VP9 WebM with alpha) previews and exports with its transparency
+- Tools for assistants: `find_shots`, `reduce_noise` and `remove_background`, and `translate_to_english` on `transcribe_media` and `add_captions`
+
 ## [0.2.0]
 
 AI features (all optional and off until you turn them on), Claude Code support, in-app updates and recovery of unsaved work.

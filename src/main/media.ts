@@ -65,6 +65,13 @@ function lastLine(text: string): string {
   return lines[lines.length - 1] ?? ''
 }
 
+/** WebM marks VP8/VP9 video that carries transparency with an alpha_mode tag. */
+function hasAlphaChannel(stream?: FfprobeStream): boolean {
+  const tags = stream?.tags ?? {}
+  const mode = tags.alpha_mode ?? tags.ALPHA_MODE
+  return (stream?.codec_name === 'vp9' || stream?.codec_name === 'vp8') && mode === '1'
+}
+
 export async function probe(path: string): Promise<ProbeResult> {
   try {
     const result = await run(ffprobePath(), [
@@ -118,7 +125,8 @@ export async function probe(path: string): Promise<ProbeResult> {
       videoCodec: video?.codec_name ?? null,
       audioCodec: audio?.codec_name ?? null,
       container: formatName,
-      size: info.size
+      size: info.size,
+      ...(kind === 'video' && hasAlphaChannel(video) ? { alpha: true } : {})
     }
     if (kind === 'video' && duration <= 0) {
       return { path, ok: false, error: 'Could not determine the duration of this file.' }
@@ -129,7 +137,7 @@ export async function probe(path: string): Promise<ProbeResult> {
   }
 }
 
-async function cacheDir(path: string): Promise<string> {
+export async function cacheDir(path: string): Promise<string> {
   const info = await stat(path)
   const key = createHash('sha1').update(`${path}|${info.size}|${info.mtimeMs}`).digest('hex').slice(0, 20)
   const dir = join(app.getPath('userData'), 'cache', key)
@@ -521,17 +529,23 @@ export async function decodeAudio(path: string, sampleRate: number): Promise<Flo
 
 /** Saves generated media (such as a voiceover) in Documents/Kificut/Generated. */
 export async function saveGenerated(name: string, data: Uint8Array): Promise<string> {
+  const target = await generatedPath(name)
+  await writeFile(target, data)
+  return target
+}
+
+/** A free file name in Documents/Kificut/Generated for something Kificut makes. */
+export async function generatedPath(name: string): Promise<string> {
   const dir = join(app.getPath('documents'), 'Kificut', 'Generated')
   await mkdir(dir, { recursive: true })
   const dot = name.lastIndexOf('.')
   const stem =
     (dot > 0 ? name.slice(0, dot) : name)
-      .replace(/[^\w\- ]+/g, '')
+      .replace(/[^\w\-() ]+/g, '')
       .trim()
       .slice(0, 60) || 'generated'
   const ext = dot > 0 ? name.slice(dot).replace(/[^\w.]/g, '') : '.wav'
   let target = join(dir, `${stem}${ext}`)
   for (let i = 2; existsSync(target); i++) target = join(dir, `${stem} ${i}${ext}`)
-  await writeFile(target, data)
   return target
 }

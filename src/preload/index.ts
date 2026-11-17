@@ -60,6 +60,22 @@ const api: KificutApi = {
     onStatus: (callback) => subscribe<[ModelStatus]>(IPC.modelsStatus, callback)
   },
 
+  localAi: {
+    searchFrames: (path, duration) => ipcRenderer.invoke(IPC.localAiSearchFrames, path, duration),
+    readSearchIndex: (path, model) => ipcRenderer.invoke(IPC.localAiReadIndex, path, model),
+    writeSearchIndex: (path, model, data) => ipcRenderer.invoke(IPC.localAiWriteIndex, path, model, data),
+    reduceNoise: (path, strength, duration) =>
+      ipcRenderer.invoke(IPC.localAiReduceNoise, path, strength, duration),
+    onNoiseProgress: (callback) =>
+      subscribe<[string, number]>(IPC.localAiNoiseProgress, (path, fraction) => callback(path, fraction)),
+    startMatte: (path, start, duration, fps, width, height) =>
+      ipcRenderer.invoke(IPC.localAiStartMatte, path, start, duration, fps, width, height),
+    readMatteFrames: (id, max) => ipcRenderer.invoke(IPC.localAiReadFrames, id, max),
+    writeMatteMasks: (id, masks) => ipcRenderer.invoke(IPC.localAiWriteMasks, id, masks),
+    finishMatte: (id) => ipcRenderer.invoke(IPC.localAiFinishMatte, id),
+    cancelMatte: (id) => ipcRenderer.invoke(IPC.localAiCancelMatte, id)
+  },
+
   updates: {
     status: () => ipcRenderer.invoke(IPC.updatesGet),
     check: () => ipcRenderer.invoke(IPC.updatesCheck),

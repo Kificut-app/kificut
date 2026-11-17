@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { AudioLines, FileVideo, ImageIcon, Link2Off, Plus, Search, Upload } from 'lucide-react'
+import { AudioLines, FileVideo, ImageIcon, Link2Off, Plus, ScanSearch, Search, Upload } from 'lucide-react'
 import type { MediaItem } from '@shared/types'
 import { formatDuration } from '@shared/time'
 import { useEditor } from '../../store/editor'
@@ -21,6 +21,7 @@ import { cssFontFamily } from '../../engine/text'
 import { modKey } from '../../lib/platform'
 import { Button, ColorField, IconButton, cx } from '../ui/controls'
 import { VoicePanel } from './VoicePanel'
+import { FootageSearch } from './FootageSearch'
 
 type Tab = 'media' | 'text' | 'elements' | 'voice'
 
@@ -65,6 +66,8 @@ function MediaBin() {
   const media = useEditor((s) => s.project?.media ?? NO_MEDIA)
   const [query, setQuery] = useState('')
   const [dropping, setDropping] = useState(false)
+  const [footage, setFootage] = useState(false)
+  const [run, setRun] = useState(0)
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -94,21 +97,34 @@ function MediaBin() {
         <div className="search">
           <Search size={13} />
           <input
-            placeholder="Search media"
+            placeholder={footage ? 'Describe a shot' : 'Search media'}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => {
               e.stopPropagation()
               if (e.key === 'Escape') setQuery('')
+              if (e.key === 'Enter' && footage) setRun((n) => n + 1)
             }}
           />
         </div>
+        <IconButton
+          tip="Search inside footage by what it shows"
+          active={footage}
+          onClick={() => {
+            setFootage((on) => !on)
+            setRun(0)
+          }}
+        >
+          <ScanSearch size={16} />
+        </IconButton>
         <IconButton tip={`Import media|${modKey}I`} onClick={() => void importDialog()}>
           <Plus size={16} />
         </IconButton>
       </div>
 
-      {media.length === 0 ? (
+      {footage && media.length > 0 ? (
+        <FootageSearch query={query} run={run} />
+      ) : media.length === 0 ? (
         <div className="media-bin__empty">
           <div className="media-bin__empty-icon">
             <Upload size={20} />

@@ -1,5 +1,20 @@
 /// <reference lib="webworker" />
-import { env, pipeline, Tensor, type AutomaticSpeechRecognitionPipeline } from '@huggingface/transformers'
+import {
+  AutoModel,
+  AutoProcessor,
+  AutoTokenizer,
+  CLIPTextModelWithProjection,
+  CLIPVisionModelWithProjection,
+  env,
+  pipeline,
+  RawImage,
+  Tensor,
+  type AutomaticSpeechRecognitionPipeline,
+  type BackgroundRemovalPipeline,
+  type PreTrainedModel,
+  type PreTrainedTokenizer,
+  type Processor
+} from '@huggingface/transformers'
 import { KokoroTTS, TextSplitterStream } from 'kokoro-js'
 import wasmUrl from 'ort-dist/ort-wasm-simd-threaded.jsep.wasm?url'
 import wasmGlueUrl from 'ort-dist/ort-wasm-simd-threaded.jsep.mjs?url'
@@ -157,7 +172,7 @@ async function transcribe(request: Extract<EngineRequest, { type: 'transcribe' }
     stride_length_s: 5,
     return_timestamps: true,
     language,
-    task: 'transcribe'
+    task: request.task
   })
   const result = Array.isArray(output) ? output[0] : output
   const chunks =
@@ -169,11 +184,148 @@ async function transcribe(request: Extract<EngineRequest, { type: 'transcribe' }
   post({ id: request.id, type: 'transcribe', language, segments })
 }
 
+/* Footage search with CLIP */
+
+const cached = new Map<string, Promise<unknown>>()
+
+/** Loads something once per key and keeps it; a failed load is retried next time. */
+function once<T>(key: string, load: () => Promise<T>): Promise<T> {
+  let loading = cached.get(key) as Promise<T> | undefined
+  if (!loading) {
+    loading = load()
+    loading.catch(() => cached.delete(key))
+    cached.set(key, loading)
+  }
+  return loading
+}
+
+function normalizeRows(data: Float32Array, dim: number): Float32Array {
+  const out = new Float32Array(data.length)
+  for (let row = 0; row < data.length / dim; row++) {
+    let sum = 0
+    for (let i = 0; i < dim; i++) sum += data[row * dim + i] ** 2
+    const scale = 1 / Math.max(Math.sqrt(sum), 1e-12)
+    for (let i = 0; i < dim; i++) out[row * dim + i] = data[row * dim + i] * scale
+  }
+  return out
+}
+
+async function embedText(request: Extract<EngineRequest, { type: 'embed-text' }>): Promise<void> {
+  const [tokenizer, model] = await Promise.all([
+    once(`${request.repo}:tokenizer`, () => AutoTokenizer.from_pretrained(request.repo)),
+    once(`${request.repo}:text`, () =>
+      CLIPTextModelWithProjection.from_pretrained(request.repo, { dtype: 'q8', device: 'wasm' })
+    )
+  ])
+  const inputs = (tokenizer as PreTrainedTokenizer)(request.texts, { padding: true, truncation: true })
+  const { text_embeds } = (await (model as PreTrainedModel)(inputs)) as { text_embeds: Tensor }
+  const dim = text_embeds.dims[text_embeds.dims.length - 1]
+  const vectors = normalizeRows(text_embeds.data as Float32Array, dim)
+  post({ id: request.id, type: 'embeddings', vectors, dim }, [vectors.buffer])
+}
+
+async function embedFrames(request: Extract<EngineRequest, { type: 'embed-frames' }>): Promise<void> {
+  const [processor, model] = await Promise.all([
+    once(`${request.repo}:processor`, () => AutoProcessor.from_pretrained(request.repo)),
+    once(`${request.repo}:vision`, () =>
+      CLIPVisionModelWithProjection.from_pretrained(request.repo, { dtype: 'q8', device: 'wasm' })
+    )
+  ])
+  const frameBytes = request.width * request.height * 3
+  const count = Math.floor(request.frames.length / frameBytes)
+  const parts: Float32Array[] = []
+  let dim = 0
+  const BATCH = 8
+  for (let start = 0; start < count; start += BATCH) {
+    const images = []
+    for (let i = start; i < Math.min(count, start + BATCH); i++) {
+      const pixels = new Uint8ClampedArray(
+        request.frames.buffer,
+        request.frames.byteOffset + i * frameBytes,
+        frameBytes
+      )
+      images.push(new RawImage(pixels, request.width, request.height, 3))
+    }
+    const inputs = await (processor as Processor)(images)
+    const { image_embeds } = (await (model as PreTrainedModel)(inputs)) as { image_embeds: Tensor }
+    dim = image_embeds.dims[image_embeds.dims.length - 1]
+    parts.push(normalizeRows(image_embeds.data as Float32Array, dim))
+    post({
+      id: request.id,
+      type: 'status',
+      message: `Looking at frames (${Math.min(count, start + BATCH)} of ${count})`
+    })
+  }
+  const vectors = new Float32Array(parts.reduce((n, p) => n + p.length, 0))
+  let offset = 0
+  for (const part of parts) {
+    vectors.set(part, offset)
+    offset += part.length
+  }
+  post({ id: request.id, type: 'embeddings', vectors, dim }, [vectors.buffer])
+}
+
+/* Background removal */
+
+function cutter(repo: string, dtype: string): Promise<BackgroundRemovalPipeline> {
+  return once(`${repo}:cutout:${dtype}`, () => {
+    const create = pipeline as unknown as (
+      task: 'background-removal',
+      model: string,
+      options: Record<string, unknown>
+    ) => Promise<BackgroundRemovalPipeline>
+    return create('background-removal', repo, { dtype, device: 'wasm' })
+  })
+}
+
+async function cutout(request: Extract<EngineRequest, { type: 'cutout' }>): Promise<void> {
+  post({ id: request.id, type: 'status', message: 'Loading the model' })
+  const remove = await cutter(request.repo, request.dtype)
+  post({ id: request.id, type: 'status', message: 'Finding the subject' })
+  const [result] = (await remove(await RawImage.fromBlob(request.image))) as RawImage[]
+  const png = await (await result.toBlob('image/png')).arrayBuffer()
+  post({ id: request.id, type: 'cutout', png }, [png])
+}
+
+/**
+ * Masks for video frames. MODNet is run directly at the frame size (a multiple of 32), which is far
+ * quicker than letting the pipeline scale every frame up to 512 pixels first.
+ */
+async function matte(request: Extract<EngineRequest, { type: 'matte' }>): Promise<void> {
+  const model = (await once(`${request.repo}:matte:${request.dtype}`, () =>
+    AutoModel.from_pretrained(request.repo, { dtype: request.dtype as 'fp32', device: 'wasm' })
+  )) as PreTrainedModel
+  const { width, height } = request
+  const pixels = width * height
+  const count = Math.floor(request.frames.length / (pixels * 3))
+  const masks = new Uint8Array(count * pixels)
+  const input = new Float32Array(3 * pixels)
+  for (let i = 0; i < count; i++) {
+    const offset = i * pixels * 3
+    // RGB bytes to planar floats in [-1, 1], as MODNet was trained.
+    for (let p = 0; p < pixels; p++) {
+      for (let c = 0; c < 3; c++) input[c * pixels + p] = request.frames[offset + p * 3 + c] / 127.5 - 1
+    }
+    const outputs = (await model({ input: new Tensor('float32', input, [1, 3, height, width]) })) as Record<
+      string,
+      Tensor
+    >
+    const alpha = Object.values(outputs)[0].data as Float32Array
+    for (let p = 0; p < pixels; p++)
+      masks[i * pixels + p] = Math.max(0, Math.min(255, Math.round(alpha[p] * 255)))
+  }
+  post({ id: request.id, type: 'masks', masks }, [masks.buffer])
+}
+
 self.onmessage = async (event: MessageEvent<EngineRequest>) => {
   const request = event.data
   try {
     if (request.type === 'voiceover') await voiceover(request)
-    else await transcribe(request)
+    else if (request.type === 'transcribe') await transcribe(request)
+    else if (request.type === 'embed-text') await embedText(request)
+    else if (request.type === 'embed-frames') await embedFrames(request)
+    else if (request.type === 'cutout') await cutout(request)
+    else await matte(request)
   } catch (error) {
     post({ id: request.id, type: 'error', message: error instanceof Error ? error.message : String(error) })
   }

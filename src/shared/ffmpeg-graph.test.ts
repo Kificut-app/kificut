@@ -121,6 +121,25 @@ describe('buildRenderPlan', () => {
     expect(plan.duration).toBe(10)
   })
 
+  it('decodes video with transparency with libvpx and keeps its alpha', () => {
+    const p = project((pr) => [
+      createClip({
+        trackId: pr.tracks[0].id,
+        kind: 'video',
+        mediaId: 'm1',
+        start: 0,
+        duration: 3,
+        inPoint: 0
+      })
+    ])
+    p.media = [
+      { ...video, path: '/media/cutout.webm', videoCodec: 'vp9', container: 'matroska,webm', alpha: true }
+    ]
+    const plan = buildRenderPlan({ project: p, settings: settings(), overlays: {} })
+    expect(plan.inputs[0]).toEqual(['-ss', '0', '-t', '3', '-c:v', 'libvpx-vp9', '-i', '/media/cutout.webm'])
+    expect(plan.filterGraph).toContain('format=rgba')
+  })
+
   it('skips hidden tracks and muted audio', () => {
     const p = project((pr) => {
       const [v1, , a1] = pr.tracks

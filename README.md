@@ -53,13 +53,25 @@ Everything AI in Kificut is optional, and nothing is downloaded or sent anywhere
 
 **Models on this computer**
 
-| Model                                                        | Used for               | Download | License                             |
-| ------------------------------------------------------------ | ---------------------- | -------- | ----------------------------------- |
-| [Kokoro 82M](https://huggingface.co/hexgrad/Kokoro-82M)      | Voiceovers (Voice tab) | 108 MB   | Apache-2.0, eSpeak NG under GPL-3.0 |
-| [Whisper Base](https://huggingface.co/openai/whisper-base)   | Captions, transcripts  | 81 MB    | MIT                                 |
-| [Whisper Small](https://huggingface.co/openai/whisper-small) | Better captions        | 254 MB   | MIT                                 |
+| Model                                                               | Used for                                               | Download | License                             |
+| ------------------------------------------------------------------- | ------------------------------------------------------ | -------- | ----------------------------------- |
+| [Kokoro 82M](https://huggingface.co/hexgrad/Kokoro-82M)             | Voiceovers (Voice tab)                                 | 108 MB   | Apache-2.0, eSpeak NG under GPL-3.0 |
+| [Whisper Base](https://huggingface.co/openai/whisper-base)          | Captions, transcripts                                  | 81 MB    | MIT                                 |
+| [Whisper Small](https://huggingface.co/openai/whisper-small)        | Better captions                                        | 254 MB   | MIT                                 |
+| [RNNoise](https://github.com/GregorR/rnnoise-models) (speech model) | Reduce Noise on dialogue                               | 0.3 MB   | Public domain                       |
+| [CLIP](https://huggingface.co/openai/clip-vit-base-patch32)         | Search inside footage by description                   | 157 MB   | MIT                                 |
+| [MODNet](https://github.com/ZHKKKe/MODNet)                          | Remove Background behind people, in video and pictures | 26 MB    | Apache-2.0                          |
+| [ORMBG](https://github.com/schirrmacher/ormbg)                      | Remove Background from any subject in pictures         | 44 MB    | Apache-2.0                          |
 
 None of these models ship with Kificut. Install the ones you want from **AI > Models on this computer**, or ask your assistant to do it ("install the voice model"): Claude Desktop and the Assistant tab can list the models and install one with the `install_ai_model` tool, and they are told to check with you first because of the download size. They are downloaded from Hugging Face at a pinned revision, every file is checked against its published hash, and they run inside Kificut with ONNX Runtime on the CPU. Your footage and scripts never leave the computer, and the models work offline once installed. Generated voiceovers are saved as WAV files in `Documents/Kificut/Generated`.
+
+What each one does in Kificut:
+
+- **Voice tab**: type a script and add a voiceover at the playhead (Kokoro).
+- **Generate Captions** and **Generate English Captions** in the clip menu: timed captions from speech, with the language detected automatically; the English version translates speech in other languages (Whisper).
+- **Reduce Noise** in the clip menu: writes a cleaned copy of the sound, with fans, air conditioning and hum removed, and switches the clip to it (RNNoise, through FFmpeg).
+- **Search inside footage**: the scan button next to the media search box. Describe a shot ("dog running on the beach") and add the matching moment to the timeline. Each file is indexed once and the index is kept (CLIP).
+- **Remove Background** in the clip menu: for pictures it makes a transparent PNG; for video it makes a WebM with transparency, so anything on a lower track shows through. Video works on people and takes a few seconds of work per second of footage (MODNet, ORMBG).
 
 Kokoro uses eSpeak NG to turn text into phonemes. eSpeak NG is GPL licensed, so it is downloaded together with the model instead of being part of Kificut.
 

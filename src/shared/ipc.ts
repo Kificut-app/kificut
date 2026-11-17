@@ -115,6 +115,32 @@ export interface KificutApi {
     onStatus(callback: (status: ModelStatus) => void): () => void
   }
 
+  /** FFmpeg work for the local AI features. */
+  localAi: {
+    /** Small square RGB frames through the file, for footage search. */
+    searchFrames(
+      path: string,
+      duration: number
+    ): Promise<{ times: number[]; width: number; height: number; data: Uint8Array }>
+    readSearchIndex(path: string, model: string): Promise<string | null>
+    writeSearchIndex(path: string, model: string, data: string): Promise<void>
+    /** Writes a denoised copy of the file's sound and returns its path. */
+    reduceNoise(path: string, strength: number, duration: number): Promise<string>
+    onNoiseProgress(callback: (path: string, fraction: number) => void): () => void
+    startMatte(
+      path: string,
+      start: number,
+      duration: number,
+      fps: number,
+      width: number,
+      height: number
+    ): Promise<{ id: number; width: number; height: number; frames: number }>
+    readMatteFrames(id: number, max: number): Promise<Uint8Array>
+    writeMatteMasks(id: number, masks: Uint8Array): Promise<void>
+    finishMatte(id: number): Promise<string>
+    cancelMatte(id: number): Promise<void>
+  }
+
   updates: {
     status(): Promise<UpdateStatus>
     /** Checks now and reports the result even when there is nothing new. */
@@ -241,6 +267,16 @@ export const IPC = {
   modelsRemove: 'models:remove',
   modelsStatus: 'models:status',
   updatesStatus: 'updates:status',
+  localAiSearchFrames: 'local-ai:search-frames',
+  localAiReadIndex: 'local-ai:read-index',
+  localAiWriteIndex: 'local-ai:write-index',
+  localAiReduceNoise: 'local-ai:reduce-noise',
+  localAiNoiseProgress: 'local-ai:noise-progress',
+  localAiStartMatte: 'local-ai:start-matte',
+  localAiReadFrames: 'local-ai:read-frames',
+  localAiWriteMasks: 'local-ai:write-masks',
+  localAiFinishMatte: 'local-ai:finish-matte',
+  localAiCancelMatte: 'local-ai:cancel-matte',
   updatesGet: 'updates:get',
   updatesCheck: 'updates:check',
   updatesInstall: 'updates:install',
