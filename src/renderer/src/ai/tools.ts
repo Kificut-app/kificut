@@ -41,7 +41,15 @@ import {
   withLinked
 } from '../lib/timeline'
 import { defaultColor, defaultTransform, TEXT_PRESETS, uid } from '../lib/factory'
-import { DEFAULT_VOICE, getLocalModel, LOCAL_MODELS, type ModelStatus } from '@shared/models'
+import {
+  DEFAULT_VOICE,
+  getLocalModel,
+  KOKORO_VOICES,
+  LOCAL_MODELS,
+  type ModelStatus,
+  type ModelTask
+} from '@shared/models'
+import { VOICE_CLONE_MODEL } from '@shared/voices'
 import {
   captionsForClip,
   cleanAudio,
@@ -1096,6 +1104,38 @@ const tools: Record<string, Tool> = {
     )
   },
 
+  async list_voices() {
+    const [statuses, support, voices] = await Promise.all([
+      window.kificut.models.list(),
+      window.kificut.voices.support(),
+      window.kificut.voices.list()
+    ])
+    const installed = (id: string) => statuses.some((s) => s.id === id && s.state === 'installed')
+    const own = support.supported
+      ? voices.map((v) => ({ id: v.id, name: v.name, model: VOICE_CLONE_MODEL }))
+      : []
+    const notes = [
+      installed('kokoro-82m') ? null : 'Kokoro voices need kokoro-82m (install_ai_model).',
+      !support.supported
+        ? `The user's own voices are not available on this computer: ${support.reason}`
+        : !installed(VOICE_CLONE_MODEL)
+          ? `The user's own voices need ${VOICE_CLONE_MODEL} (install_ai_model).`
+          : voices.length === 0
+            ? "The user has not added a voice of their own. They can do that in Kificut's Voice tab."
+            : null
+    ].filter(Boolean)
+    return json(`Voices for generate_voiceover. ${notes.join(' ')}`.trim(), {
+      own_voices: own.map((v) => ({ ...v, ready: installed(VOICE_CLONE_MODEL) })),
+      kokoro_voices: KOKORO_VOICES.map((v) => ({
+        id: v.id,
+        name: v.name,
+        accent: v.accent,
+        gender: v.gender,
+        ready: installed('kokoro-82m')
+      }))
+    })
+  },
+
   async list_ai_models() {
     const statuses = await window.kificut.models.list()
     return json(
@@ -1105,7 +1145,7 @@ const tools: Record<string, Tool> = {
         return {
           id: model.id,
           name: model.name,
-          used_by: model.task === 'voiceover' ? ['generate_voiceover'] : ['transcribe_media', 'add_captions'],
+          used_by: USED_BY[model.task],
           description: model.description,
           download_mb: Math.round(model.approximateSize / 1e6),
           license: model.license,
@@ -1272,6 +1312,16 @@ const tools: Record<string, Tool> = {
         return text(`The export failed: ${job.error}`)
     }
   }
+}
+
+/** Which tools each kind of model is for, as list_ai_models reports it. */
+const USED_BY: Record<ModelTask, string[]> = {
+  voiceover: ['generate_voiceover'],
+  'voice-clone': ['generate_voiceover', 'list_voices'],
+  transcription: ['transcribe_media', 'add_captions'],
+  noise: ['reduce_noise'],
+  search: ['find_shots'],
+  background: ['remove_background']
 }
 
 /** Runs one tool call and turns any failure into an error result the assistant can read. */

@@ -10,6 +10,18 @@ files:
   - out/**/*
   - package.json
   - '!**/*.map'
+  # ONNX Runtime for custom voices (src/main/voice-engine.ts): only this build's platform and
+  # architecture, without the GPU providers, the second copy of the macOS library (the binding
+  # loads libonnxruntime.1.dylib), the TypeScript sources and the install scripts.
+  - '!node_modules/onnxruntime-node/bin/napi-v6/!(${platform})/**'
+  - '!node_modules/onnxruntime-node/bin/napi-v6/${platform}/!(${arch})/**'
+  - '!node_modules/onnxruntime-node/bin/**/*{cuda,tensorrt}*'
+  - '!node_modules/onnxruntime-node/bin/**/libonnxruntime.*.*.*.dylib'
+  - '!node_modules/onnxruntime-node/{lib,script}/**'
+
+# Native libraries cannot be loaded from inside the asar archive.
+asarUnpack:
+  - node_modules/onnxruntime-node/bin/**
 
 # FFmpeg runs as a separate process, so the binaries ship as plain resources outside the asar.
 extraResources:
@@ -48,6 +60,8 @@ fileAssociations:
 mac:
   category: public.app-category.video
   icon: build/icon.png
+  extendInfo:
+    NSMicrophoneUsageDescription: Kificut uses the microphone when you record your voice for voiceovers in your own voice.
   hardenedRuntime: true
   gatekeeperAssess: false
   entitlements: build/entitlements.mac.plist

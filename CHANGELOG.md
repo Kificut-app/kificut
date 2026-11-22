@@ -9,6 +9,12 @@ All notable changes to this project are documented here. The format follows [Kee
 - Linux release: an AppImage for x86_64 attached to each release, with in-app updates. It uses the static AppImage runtime, so it does not need libfuse2, and starts without Chromium's sandbox where the system blocks it
 - The Linux AppImage adds itself to the applications menu with its icon and the .kificut file type, and keeps the entry pointing at the AppImage after updates. Wayland desktops need this before they allow screen recording and global shortcuts. Set `KIFICUT_NO_DESKTOP_INTEGRATION=1` to skip it
 - Claude Code on Linux: the AppImage runs the connector itself with `--mcp-server`, and Kificut points Claude Code at the new file when an update or a move changes the AppImage's path
+- My voices: voiceovers in your own voice, or a voice you have permission to use, from a recording of 10 to 20 seconds. Record in the Voice tab, use the selected clip or pick a file, confirm the voice may be used, and pick it for any script. Chatterbox Turbo (725 MB, MIT) runs on this computer in a background process with the native ONNX Runtime; nothing is trained or uploaded. Not available on Intel Macs yet
+- Tools for assistants: `list_voices`, and `generate_voiceover` takes the user's own voices
+
+### Fixed
+
+- `list_ai_models` named the transcription tools as the users of every model other than Kokoro
 
 ## [0.3.0]
 

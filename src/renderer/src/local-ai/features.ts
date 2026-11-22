@@ -11,6 +11,7 @@ import {
   type TranscriptSegment
 } from '@shared/models'
 import { findMoments, type Moment } from '@shared/search'
+import { isCustomVoiceId, VOICE_CLONE_MODEL } from '@shared/voices'
 import { encodeWav } from '../lib/wav'
 import { mediaUrl } from '../lib/media'
 import { beginTask } from '../store/ui'
@@ -25,6 +26,7 @@ function missingMessage(task: ModelTask): string {
     .join('; or ')
   const what: Record<ModelTask, string> = {
     voiceover: 'The voiceover model is',
+    'voice-clone': 'The custom voice model is',
     transcription: 'No speech recognition model is',
     noise: 'The noise reduction model is',
     search: 'The footage search model is',
@@ -75,7 +77,12 @@ export async function createVoiceover(
   onStatus?: (message: string) => void
 ): Promise<Voiceover> {
   if (!text.trim()) throw new Error('There is no text to speak.')
-  if (!KOKORO_VOICES.some((v) => v.id === voice)) throw new Error(`Unknown voice "${voice}".`)
+  if (isCustomVoiceId(voice)) return customVoiceover(text, voice, speed, onStatus)
+  if (!KOKORO_VOICES.some((v) => v.id === voice)) {
+    throw new Error(
+      `Unknown voice "${voice}". Use a Kokoro voice id or the id of a custom voice from list_voices.`
+    )
+  }
   if (!(await installedIds()).has('kokoro-82m')) throw new ModelMissingError('voiceover')
   const task = beginTask('Voiceover')
   try {
@@ -90,6 +97,34 @@ export async function createVoiceover(
     )
     return { path, duration: audio.length / sampleRate }
   } finally {
+    task.end()
+  }
+}
+
+/** A voiceover in one of the user's own voices, made by Chatterbox Turbo in the main process. */
+async function customVoiceover(
+  text: string,
+  voice: string,
+  speed: number,
+  onStatus?: (message: string) => void
+): Promise<Voiceover> {
+  const support = await window.kificut.voices.support()
+  if (!support.supported) throw new Error(support.reason)
+  if (!(await installedIds()).has(VOICE_CLONE_MODEL)) throw new ModelMissingError('voice-clone')
+  const task = beginTask('Voiceover')
+  const off = window.kificut.voices.onStatus((message) => {
+    task.update(message)
+    onStatus?.(message)
+  })
+  try {
+    return await window.kificut.voices.speak(voice, text.trim(), speed)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    throw new Error(message.replace(/^Error invoking remote method '[^']+': (Error: )?/, ''), {
+      cause: error
+    })
+  } finally {
+    off()
     task.end()
   }
 }

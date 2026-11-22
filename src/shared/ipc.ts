@@ -2,6 +2,7 @@ import type { ExportProgress, ExportResult, ExportSettings } from './export-form
 import type { OverlayImage } from './ffmpeg-graph'
 import type { ToolResult } from './ai-tools'
 import type { ModelStatus } from './models'
+import type { CreateVoiceRequest, CustomVoice, VoiceSupport } from './voices'
 import type { RecoverySnapshot, UpdateStatus } from './updates'
 import type { AssistantEvent, AssistantSettings, ProviderId, ProviderUpdate } from './assistant'
 import type {
@@ -113,6 +114,25 @@ export interface KificutApi {
     cancel(id: string): Promise<void>
     remove(id: string): Promise<ModelStatus>
     onStatus(callback: (status: ModelStatus) => void): () => void
+  }
+
+  /** The user's own voices, spoken by Chatterbox Turbo in a background process. */
+  voices: {
+    support(): Promise<VoiceSupport>
+    list(): Promise<CustomVoice[]>
+    /** Cleans up and stores the reference recording. Rejects when there is too little speech. */
+    create(request: CreateVoiceRequest): Promise<CustomVoice>
+    rename(id: string, name: string): Promise<CustomVoice>
+    remove(id: string): Promise<void>
+    /** Says the text in the voice and saves a WAV file in Documents/Kificut/Generated. */
+    speak(id: string, text: string, speed: number): Promise<{ path: string; duration: number }>
+    /** Stops the voiceover being made; `speak` then rejects. */
+    cancel(): Promise<void>
+    /** Asks for the microphone where the system requires it (macOS). Resolves false if refused. */
+    allowMicrophone(): Promise<boolean>
+    pickFile(): Promise<string | null>
+    onStatus(callback: (message: string) => void): () => void
+    onChange(callback: (voices: CustomVoice[]) => void): () => void
   }
 
   /** FFmpeg work for the local AI features. */
@@ -266,6 +286,17 @@ export const IPC = {
   modelsCancel: 'models:cancel',
   modelsRemove: 'models:remove',
   modelsStatus: 'models:status',
+  voicesSupport: 'voices:support',
+  voicesList: 'voices:list',
+  voicesCreate: 'voices:create',
+  voicesRename: 'voices:rename',
+  voicesRemove: 'voices:remove',
+  voicesSpeak: 'voices:speak',
+  voicesCancel: 'voices:cancel',
+  voicesMicrophone: 'voices:microphone',
+  voicesPickFile: 'voices:pick-file',
+  voicesStatus: 'voices:status',
+  voicesChanged: 'voices:changed',
   updatesStatus: 'updates:status',
   localAiSearchFrames: 'local-ai:search-frames',
   localAiReadIndex: 'local-ai:read-index',

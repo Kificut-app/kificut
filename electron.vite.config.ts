@@ -6,7 +6,21 @@ const shared = resolve(__dirname, 'src/shared')
 
 export default defineConfig({
   main: {
-    resolve: { alias: { '@shared': shared } }
+    resolve: {
+      alias: {
+        '@shared': shared,
+        sharp: resolve(__dirname, 'src/main/sharp-stub.ts')
+      }
+    },
+    build: {
+      rolldownOptions: {
+        input: {
+          index: resolve(__dirname, 'src/main/index.ts'),
+          // The utility process for custom voices (transformers.js 4 with onnxruntime-node).
+          'voice-worker': resolve(__dirname, 'src/main/voice-worker.ts')
+        }
+      }
+    }
   },
   preload: {
     resolve: { alias: { '@shared': shared } }

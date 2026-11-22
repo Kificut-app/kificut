@@ -36,6 +36,7 @@ describe('AI tool definitions', () => {
         'inspect_media',
         'list_ai_models',
         'list_media_files',
+        'list_voices',
         'transcribe_media',
         'view_frame'
       ].sort()

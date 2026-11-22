@@ -85,7 +85,7 @@ jobs:
             if [ "$RUNNER_OS" = "macOS" ]; then extra+=(--config.mac.identity=-); fi
           fi
           npx electron-builder ${{ matrix.args }} --publish never "${extra[@]}"
-      - name: Check the bundled FFmpeg
+      - name: Check the bundled binaries
         shell: bash
         run: |
           if [ "$RUNNER_OS" = "macOS" ]; then
@@ -99,10 +99,24 @@ jobs:
             codesign --verify --deep --verbose=1 "$app"
             test -f "$app"/Contents/Resources/connectors/*.mcpb
             test -f "$app"/Contents/Resources/connectors/kificut-mcp.js
+            # Custom voices: the ONNX Runtime binary for Apple Silicon, and none on Intel (no build exists).
+            ort="$app/Contents/Resources/app.asar.unpacked/node_modules/onnxruntime-node/bin/napi-v6"
+            if [ "${{ matrix.expect }}" = "arm64" ]; then
+              for lib in onnxruntime_binding.node libonnxruntime.1.dylib; do
+                info=$(file "$ort/darwin/arm64/$lib")
+                echo "$info"
+                echo "$info" | grep -q arm64 || { echo "::error::$lib is missing or has the wrong architecture"; exit 1; }
+              done
+            else
+              test -z "$(find "$ort" -type f 2>/dev/null)" || { echo "::error::ONNX Runtime binaries in the Intel build"; exit 1; }
+            fi
           elif [ "$RUNNER_OS" = "Linux" ]; then
             ls -l release/*/linux-unpacked/resources/bin
             test -f release/*/linux-unpacked/resources/connectors/kificut-mcp.js
             test -f release/*/linux-unpacked/resources/app-update.yml
+            ls -l release/*/linux-unpacked/resources/app.asar.unpacked/node_modules/onnxruntime-node/bin/napi-v6/linux/x64
+            test -f release/*/linux-unpacked/resources/app.asar.unpacked/node_modules/onnxruntime-node/bin/napi-v6/linux/x64/libonnxruntime.so.1
+            test -z "$(find release/*/linux-unpacked/resources/app.asar.unpacked -name '*cuda*')"
             test -f release/*/latest-linux.yml
             ls release/*/*.AppImage
           else
@@ -113,6 +127,7 @@ jobs:
             test -f release/*/latest.yml
             test -f release/*/win-unpacked/resources/bin/ffmpeg.exe
             test -f release/*/win-unpacked/resources/bin/ffprobe.exe
+            test -f release/*/win-unpacked/resources/app.asar.unpacked/node_modules/onnxruntime-node/bin/napi-v6/win32/x64/onnxruntime.dll
           fi
           # Noise reduction needs the arnndn filter, and background removal for video needs libvpx.
           if [ "$RUNNER_OS" = "macOS" ]; then ffmpeg="$app/Contents/Resources/bin/ffmpeg"

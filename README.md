@@ -28,7 +28,7 @@ Kificut is a multi-track editor built on Electron and FFmpeg. The preview is dra
 
 **AI, on your terms**
 
-- Voiceovers from a script with Kokoro, 28 natural English voices, generated on your computer
+- Voiceovers from a script with Kokoro, 28 natural English voices, or in your own voice from a recording of 10 to 20 seconds, generated on your computer
 - Captions from speech with Whisper in about 100 languages, also on your computer. Right click a clip and choose Generate Captions
 - An assistant panel that edits with you. Bring your own key for Anthropic, OpenAI, Google Gemini or OpenRouter, or use a local model through Ollama, LM Studio or any OpenAI compatible server
 - Connect Claude Desktop and ask for edits in plain language: "make a 30 second reel from the clips in my Trip folder with a title and some music". See [Use Kificut from Claude](#use-kificut-from-claude)
@@ -64,27 +64,31 @@ Everything AI in Kificut is optional, and nothing is downloaded or sent anywhere
 
 **Models on this computer**
 
-| Model                                                               | Used for                                               | Download | License                             |
-| ------------------------------------------------------------------- | ------------------------------------------------------ | -------- | ----------------------------------- |
-| [Kokoro 82M](https://huggingface.co/hexgrad/Kokoro-82M)             | Voiceovers (Voice tab)                                 | 108 MB   | Apache-2.0, eSpeak NG under GPL-3.0 |
-| [Whisper Base](https://huggingface.co/openai/whisper-base)          | Captions, transcripts                                  | 81 MB    | MIT                                 |
-| [Whisper Small](https://huggingface.co/openai/whisper-small)        | Better captions                                        | 254 MB   | MIT                                 |
-| [RNNoise](https://github.com/GregorR/rnnoise-models) (speech model) | Reduce Noise on dialogue                               | 0.3 MB   | Public domain                       |
-| [CLIP](https://huggingface.co/openai/clip-vit-base-patch32)         | Search inside footage by description                   | 157 MB   | MIT                                 |
-| [MODNet](https://github.com/ZHKKKe/MODNet)                          | Remove Background behind people, in video and pictures | 26 MB    | Apache-2.0                          |
-| [ORMBG](https://github.com/schirrmacher/ormbg)                      | Remove Background from any subject in pictures         | 44 MB    | Apache-2.0                          |
+| Model                                                                  | Used for                                               | Download | License                             |
+| ---------------------------------------------------------------------- | ------------------------------------------------------ | -------- | ----------------------------------- |
+| [Kokoro 82M](https://huggingface.co/hexgrad/Kokoro-82M)                | Voiceovers (Voice tab)                                 | 108 MB   | Apache-2.0, eSpeak NG under GPL-3.0 |
+| [Chatterbox Turbo](https://huggingface.co/ResembleAI/chatterbox-turbo) | Voiceovers in your own voice (Voice tab, My voices)    | 725 MB   | MIT                                 |
+| [Whisper Base](https://huggingface.co/openai/whisper-base)             | Captions, transcripts                                  | 81 MB    | MIT                                 |
+| [Whisper Small](https://huggingface.co/openai/whisper-small)           | Better captions                                        | 254 MB   | MIT                                 |
+| [RNNoise](https://github.com/GregorR/rnnoise-models) (speech model)    | Reduce Noise on dialogue                               | 0.3 MB   | Public domain                       |
+| [CLIP](https://huggingface.co/openai/clip-vit-base-patch32)            | Search inside footage by description                   | 157 MB   | MIT                                 |
+| [MODNet](https://github.com/ZHKKKe/MODNet)                             | Remove Background behind people, in video and pictures | 26 MB    | Apache-2.0                          |
+| [ORMBG](https://github.com/schirrmacher/ormbg)                         | Remove Background from any subject in pictures         | 44 MB    | Apache-2.0                          |
 
 None of these models ship with Kificut. Install the ones you want from **AI > Models on this computer**, or ask your assistant to do it ("install the voice model"): Claude Desktop and the Assistant tab can list the models and install one with the `install_ai_model` tool, and they are told to check with you first because of the download size. They are downloaded from Hugging Face at a pinned revision, every file is checked against its published hash, and they run inside Kificut with ONNX Runtime on the CPU. Your footage and scripts never leave the computer, and the models work offline once installed. Generated voiceovers are saved as WAV files in `Documents/Kificut/Generated`.
 
 What each one does in Kificut:
 
 - **Voice tab**: type a script and add a voiceover at the playhead (Kokoro).
+- **My voices** in the Voice tab: record yourself for 10 to 20 seconds, use the selected clip where someone speaks, or pick a file, and Kificut reads any script in that voice. Nothing is trained or uploaded; the trimmed recording is kept in Kificut's settings folder until you delete the voice. It is slower than Kokoro, a minute or two for 30 seconds of speech, and English only (Chatterbox Turbo). Not available on Intel Macs yet.
 - **Generate Captions** and **Generate English Captions** in the clip menu: timed captions from speech, with the language detected automatically; the English version translates speech in other languages (Whisper).
 - **Reduce Noise** in the clip menu: writes a cleaned copy of the sound, with fans, air conditioning and hum removed, and switches the clip to it (RNNoise, through FFmpeg).
 - **Search inside footage**: the scan button next to the media search box. Describe a shot ("dog running on the beach") and add the matching moment to the timeline. Each file is indexed once and the index is kept (CLIP).
 - **Remove Background** in the clip menu: for pictures it makes a transparent PNG; for video it makes a WebM with transparency, so anything on a lower track shows through. Video works on people and takes a few seconds of work per second of footage (MODNet, ORMBG).
 
 Kokoro uses eSpeak NG to turn text into phonemes. eSpeak NG is GPL licensed, so it is downloaded together with the model instead of being part of Kificut.
+
+Only use your own voice for My voices, or a voice you have the speaker's permission for, and do not pass off what it says as their real words. Kificut asks you to confirm this for every voice, and assistants can use your voices but cannot add new ones.
 
 **Assistant with your own key**
 
@@ -163,7 +167,7 @@ npm run dev
 
 ### Packaging notes
 
-Build each installer on the operating system it targets, because the bundled FFmpeg binary is platform specific. To build for Intel Macs from an Apple Silicon machine, reinstall with `npm_config_arch=x64 npm ci` and run `npm run dist:mac -- --x64`.
+Build each installer on the operating system it targets, because the bundled FFmpeg binary is platform specific. The installer also includes ONNX Runtime's native library for its platform (from `onnxruntime-node`, 43 to 64 MB) for custom voices; `electron-builder.yml` leaves out the other platforms and the GPU providers, and `.npmrc` stops `npm install` from downloading CUDA libraries on Linux. Intel Mac builds have no custom voices, because onnxruntime-node has no build for them. To build for Intel Macs from an Apple Silicon machine, reinstall with `npm_config_arch=x64 npm ci` and run `npm run dist:mac -- --x64`.
 
 Signing is handled by electron-builder. Set `CSC_LINK` and `CSC_KEY_PASSWORD` for Windows and macOS certificates, and the `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD` and `APPLE_TEAM_ID` variables to notarize on macOS. The CI workflow in `.github/workflows/ci.yml` builds unsigned installers for every tag that starts with `v`.
 

@@ -1,11 +1,12 @@
 /*
  * Local AI models Kificut can download and run on the user's computer. Each one is pinned to an
  * exact Hugging Face commit, and every file is checked against the hashes Hugging Face publishes.
- * Models run in the renderer through transformers.js (WebGPU when available, WebAssembly
- * otherwise), so nothing leaves the computer.
+ * Most models run in the renderer through transformers.js on WebAssembly; models marked
+ * `runtime: 'native'` run in a background process with the native ONNX Runtime. Nothing leaves the
+ * computer either way.
  */
 
-export type ModelTask = 'voiceover' | 'transcription' | 'noise' | 'search' | 'background'
+export type ModelTask = 'voiceover' | 'voice-clone' | 'transcription' | 'noise' | 'search' | 'background'
 
 /** A file fetched from somewhere other than the model repository, with a pinned hash. */
 export interface ExtraFile {
@@ -34,6 +35,16 @@ export interface LocalModelInfo {
   rank?: number
   /** Precision to load the ONNX weights at, matching the file in `files`. */
   dtype?: string
+  /**
+   * 'native' models run with onnxruntime-node in a utility process, for models too slow or too
+   * large for WebAssembly. They are only offered where Kificut ships that runtime.
+   */
+  runtime?: 'native'
+  /**
+   * ONNX graphs (paths in `files`) whose 4 bit matmuls are switched to ONNX Runtime's fast integer
+   * path once downloaded. See src/main/onnx-patch.ts.
+   */
+  fastMatMuls?: string[]
   extras: ExtraFile[]
   homepage: string
 }
@@ -97,6 +108,7 @@ export const RNNOISE_FILE = 'sh.rnnn'
 
 export const TASK_LABELS: Record<ModelTask, string> = {
   voiceover: 'Voiceover',
+  'voice-clone': 'Custom voices',
   transcription: 'Speech to text',
   noise: 'Audio cleanup',
   search: 'Footage search',
@@ -117,6 +129,9 @@ const WHISPER_FILES = [
   'onnx/encoder_model_quantized.onnx',
   'onnx/decoder_model_merged_quantized.onnx'
 ]
+
+/** The four ONNX graphs of Chatterbox, each with its weights in a separate .onnx_data file. */
+const CHATTERBOX_PARTS = ['embed_tokens', 'speech_encoder', 'language_model', 'conditional_decoder']
 
 export const LOCAL_MODELS: LocalModelInfo[] = [
   {
@@ -144,6 +159,30 @@ export const LOCAL_MODELS: LocalModelInfo[] = [
       }
     ],
     homepage: 'https://huggingface.co/hexgrad/Kokoro-82M'
+  },
+  {
+    id: 'chatterbox-turbo',
+    name: 'Chatterbox Turbo',
+    task: 'voice-clone',
+    description:
+      'Voiceovers in your own voice, or a voice you have permission to use, learned from a recording of 10 to 20 seconds. English.',
+    license: 'MIT',
+    approximateSize: 725_000_000,
+    repo: 'ResembleAI/chatterbox-turbo-ONNX',
+    revision: 'd21799bd0354adb85e348b8a0442a8405110a2cf',
+    dtype: 'q4',
+    runtime: 'native',
+    files: [
+      'config.json',
+      'generation_config.json',
+      'preprocessor_config.json',
+      'tokenizer.json',
+      'tokenizer_config.json',
+      ...CHATTERBOX_PARTS.flatMap((part) => [`onnx/${part}_q4.onnx`, `onnx/${part}_q4.onnx_data`])
+    ],
+    fastMatMuls: CHATTERBOX_PARTS.map((part) => `onnx/${part}_q4.onnx`),
+    extras: [],
+    homepage: 'https://huggingface.co/ResembleAI/chatterbox-turbo'
   },
   {
     id: 'whisper-base',

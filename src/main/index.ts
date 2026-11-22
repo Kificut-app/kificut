@@ -23,7 +23,10 @@ import {
 } from './media'
 import { cancelModelInstall, installModel, listModelStatus, modelsDir, removeModel } from './models'
 import { registerAssistantIpc } from './assistant'
+import { registerVoiceIpc } from './voices'
 import { integrateAppImage } from './linux-desktop'
+import { stopVoiceEngine } from './voice-engine'
+import { VOICE_CLONE_MODEL } from '@shared/voices'
 import { checkForUpdates, installUpdate, startUpdater, updateStatus } from './updater'
 import { clearRecovery, readRecovery, saveRecovery } from './recovery'
 import { connectClaudeCode, refreshClaudeCodeRegistration } from './claude-code'
@@ -212,9 +215,14 @@ function registerIpc(): void {
   ipcMain.handle(IPC.modelsList, () => listModelStatus())
   ipcMain.handle(IPC.modelsInstall, (_event, id: string) => installModel(id))
   ipcMain.handle(IPC.modelsCancel, (_event, id: string) => cancelModelInstall(id))
-  ipcMain.handle(IPC.modelsRemove, (_event, id: string) => removeModel(id))
+  ipcMain.handle(IPC.modelsRemove, (_event, id: string) => {
+    // The voice engine keeps the model's files open, which Windows will not delete.
+    if (id === VOICE_CLONE_MODEL) stopVoiceEngine()
+    return removeModel(id)
+  })
 
   registerAssistantIpc()
+  registerVoiceIpc()
 
   ipcMain.handle(IPC.updatesGet, () => updateStatus())
   ipcMain.handle(IPC.updatesCheck, () => checkForUpdates(true))

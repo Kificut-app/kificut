@@ -1,4 +1,12 @@
-import { forwardRef, useEffect, useRef, useState, type ButtonHTMLAttributes, type ReactNode } from 'react'
+import {
+  forwardRef,
+  Fragment,
+  useEffect,
+  useRef,
+  useState,
+  type ButtonHTMLAttributes,
+  type ReactNode
+} from 'react'
 import { clamp } from '@shared/time'
 
 function cx(...names: Array<string | false | null | undefined>): string {
@@ -246,12 +254,28 @@ export function ColorField({ value, onChange }: ColorFieldProps) {
   )
 }
 
+interface SelectOption<T> {
+  value: T
+  label: string
+  /** Options with the same group are listed under that heading, in the order groups first appear. */
+  group?: string
+}
+
 interface SelectProps<T extends string | number> {
   value: T
-  options: Array<{ value: T; label: string }>
+  options: Array<SelectOption<T>>
   onChange: (value: T) => void
   className?: string
   disabled?: boolean
+}
+
+function groupOptions<T>(options: Array<SelectOption<T>>): Array<[string, Array<SelectOption<T>>]> {
+  const groups = new Map<string, Array<SelectOption<T>>>()
+  for (const option of options) {
+    const key = option.group ?? ''
+    groups.set(key, [...(groups.get(key) ?? []), option])
+  }
+  return [...groups]
 }
 
 export function Select<T extends string | number>({
@@ -272,11 +296,20 @@ export function Select<T extends string | number>({
         }}
         onKeyDown={(e) => e.stopPropagation()}
       >
-        {options.map((o) => (
-          <option key={String(o.value)} value={String(o.value)}>
-            {o.label}
-          </option>
-        ))}
+        {groupOptions(options).map(([group, items]) => {
+          const rendered = items.map((o) => (
+            <option key={String(o.value)} value={String(o.value)}>
+              {o.label}
+            </option>
+          ))
+          return group ? (
+            <optgroup key={group} label={group}>
+              {rendered}
+            </optgroup>
+          ) : (
+            <Fragment key="">{rendered}</Fragment>
+          )
+        })}
       </select>
     </div>
   )

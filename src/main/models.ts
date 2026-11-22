@@ -11,6 +11,8 @@ import {
   type DownloadTarget,
   type FetchLike
 } from './download'
+import { useFastMatMuls } from './onnx-patch'
+import { voiceSupport } from './voice-engine'
 
 /*
  * Downloads, verifies and removes local AI models. Files go to <userData>/models, laid out like the
@@ -152,6 +154,10 @@ export async function installModel(id: string): Promise<ModelStatus> {
   if (!model) throw new Error('Unknown model.')
   const running = active.get(id)
   if (running) return running.status
+  if (model.runtime === 'native') {
+    const support = voiceSupport()
+    if (!support.supported) throw new Error(support.reason)
+  }
 
   failures.delete(id)
   const controller = new AbortController()
@@ -181,6 +187,11 @@ export async function installModel(id: string): Promise<ModelStatus> {
           status.received += n
           report()
         })
+      }
+      // Graphs are patched after every file is verified. A reinstall finds the patched graphs no
+      // longer match their hash, fetches those few small files again and patches them again.
+      for (const graph of model.fastMatMuls ?? []) {
+        await useFastMatMuls(join(repoDir(model), ...graph.split('/')))
       }
       const marker: MarkerFile = { revision: model.revision, installedAt: new Date().toISOString() }
       await writeFile(join(repoDir(model), MARKER), JSON.stringify(marker, null, 2))

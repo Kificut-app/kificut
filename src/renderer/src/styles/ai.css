@@ -457,8 +457,14 @@
   font-variant-numeric: tabular-nums;
 }
 
-.voice__generate {
+.voice__actions {
+  display: flex;
+  gap: 8px;
   margin-top: 16px;
+}
+
+.voice__generate {
+  flex: 1;
 }
 
 .voice__note {
@@ -469,6 +475,8 @@
 }
 
 .voice--setup {
+  display: flex;
+  flex-direction: column;
   align-items: center;
   gap: 10px;
   padding: 24px 18px;
@@ -503,6 +511,206 @@
 .voice__error {
   color: var(--danger);
   font-size: 11.5px;
+}
+
+/* Kokoro install and My voices, below the script */
+
+.voice__section {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.voice__heading {
+  color: var(--text-dim);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.voice__text {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.voice__section .voice__progress {
+  width: 100%;
+}
+
+.voice__list {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.voice__item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 30px;
+  padding: 0 2px 0 8px;
+  border-radius: var(--radius-sm);
+}
+
+.voice__item:hover {
+  background: var(--bg-hover);
+}
+
+.voice__item-icon {
+  flex: none;
+  margin-right: 4px;
+  color: var(--text-dim);
+}
+
+.voice__item-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 12.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.voice__item-meta {
+  margin-left: 6px;
+  color: var(--text-faint);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.voice__rename {
+  flex: 1;
+  height: 24px;
+}
+
+/* Add My Voice */
+
+.add-voice__intro {
+  margin-bottom: 4px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.add-voice__methods {
+  margin-top: 16px;
+}
+
+.add-voice__panel {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  background: var(--bg-panel-raised);
+}
+
+.add-voice__hint {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.add-voice__hint strong {
+  color: var(--text);
+  font-weight: 550;
+}
+
+.add-voice__reading {
+  margin: 8px 0 12px;
+  padding: 10px 12px;
+  border-left: 2px solid var(--accent-line);
+  border-radius: var(--radius-xs);
+  background: var(--bg-input);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.add-voice__recorder {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 32px;
+}
+
+.add-voice__time {
+  color: var(--text);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.add-voice__meter {
+  flex: 1;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: var(--bg-input);
+}
+
+.add-voice__meter span {
+  display: block;
+  height: 100%;
+  background: var(--success);
+  transition: width 80ms linear;
+}
+
+.add-voice__playback {
+  flex: 1;
+  min-width: 0;
+  height: 30px;
+}
+
+.add-voice__file {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.add-voice__panel .add-voice__recorder + .add-voice__hint {
+  margin-top: 10px;
+}
+
+.add-voice__consent {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 16px;
+  color: var(--text);
+  font-size: 12.5px;
+  line-height: 1.45;
+  cursor: pointer;
+}
+
+.add-voice__consent input {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  margin: 2px 0 0;
+  accent-color: var(--accent);
+}
+
+.add-voice__warning {
+  margin-top: 8px;
+  color: var(--warning);
+  font-size: 12px;
+}
+
+.add-voice__error {
+  margin-top: 10px;
+  color: var(--danger);
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .ai-dialog .setting__control > .select {

@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { isDirty, useEditor } from '../store/editor'
 import { handleWindowClose, openProjectPath, saveProject, setProxyStatus } from '../store/actions'
 import { startModelSync } from '../store/models'
+import { startVoiceSync } from '../store/voices'
 import { startAssistantSync } from '../store/assistant'
 import { startUpdateSync } from '../store/updates'
 import { offerRecovery, startRecoveryWriter } from '../lib/recovery'
@@ -10,6 +11,7 @@ import { offerRecovery, startRecoveryWriter } from '../lib/recovery'
 export function useBoot(): void {
   useEffect(() => {
     startModelSync()
+    startVoiceSync()
     startAssistantSync()
     startUpdateSync()
     // Read any recovered work before the writer starts, so it is not cleared first.

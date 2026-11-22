@@ -3,6 +3,7 @@ import { IPC, type AiCall, type KificutApi, type MenuCommand } from '@shared/ipc
 import type { ExportProgress } from '@shared/export-formats'
 import type { AiStatus, ProxyStatus } from '@shared/types'
 import type { ModelStatus } from '@shared/models'
+import type { CustomVoice } from '@shared/voices'
 import type { AssistantEvent } from '@shared/assistant'
 import type { UpdateStatus } from '@shared/updates'
 
@@ -58,6 +59,20 @@ const api: KificutApi = {
     cancel: (id) => ipcRenderer.invoke(IPC.modelsCancel, id),
     remove: (id) => ipcRenderer.invoke(IPC.modelsRemove, id),
     onStatus: (callback) => subscribe<[ModelStatus]>(IPC.modelsStatus, callback)
+  },
+
+  voices: {
+    support: () => ipcRenderer.invoke(IPC.voicesSupport),
+    list: () => ipcRenderer.invoke(IPC.voicesList),
+    create: (request) => ipcRenderer.invoke(IPC.voicesCreate, request),
+    rename: (id, name) => ipcRenderer.invoke(IPC.voicesRename, id, name),
+    remove: (id) => ipcRenderer.invoke(IPC.voicesRemove, id),
+    speak: (id, text, speed) => ipcRenderer.invoke(IPC.voicesSpeak, id, text, speed),
+    cancel: () => ipcRenderer.invoke(IPC.voicesCancel),
+    allowMicrophone: () => ipcRenderer.invoke(IPC.voicesMicrophone),
+    pickFile: () => ipcRenderer.invoke(IPC.voicesPickFile),
+    onStatus: (callback) => subscribe<[string]>(IPC.voicesStatus, callback),
+    onChange: (callback) => subscribe<[CustomVoice[]]>(IPC.voicesChanged, callback)
   },
 
   localAi: {

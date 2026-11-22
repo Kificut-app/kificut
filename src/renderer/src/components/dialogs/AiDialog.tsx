@@ -7,6 +7,7 @@ import {
   CircleCheck,
   ExternalLink,
   KeyRound,
+  MicVocal,
   ScanSearch,
   UserRoundX
 } from 'lucide-react'
@@ -17,6 +18,7 @@ import { errorText } from '../../store/actions'
 import { cancelModelInstall, formatBytes, installModel, removeModel, useModels } from '../../store/models'
 import { toast, useUi } from '../../store/ui'
 import { useAssistant } from '../../store/assistant'
+import { useVoices } from '../../store/voices'
 import { Button, Segmented, Select } from '../ui/controls'
 import { Modal } from '../ui/overlays'
 
@@ -51,6 +53,7 @@ export function AiDialog() {
 /** Where each kind of model shows up in Kificut. */
 const TASK_USES: Record<ModelTask, string> = {
   voiceover: 'The Voice tab in the media panel.',
+  'voice-clone': 'My voices in the Voice tab, and voiceovers by assistants in those voices.',
   transcription: 'Generate Captions in the clip menu, and transcripts for assistants.',
   noise: 'Reduce Noise in the clip menu.',
   search: 'Search inside footage in the media panel.',
@@ -59,6 +62,7 @@ const TASK_USES: Record<ModelTask, string> = {
 
 const TASK_ICONS = {
   voiceover: AudioLines,
+  'voice-clone': MicVocal,
   transcription: Captions,
   noise: AudioWaveform,
   search: ScanSearch,
@@ -85,6 +89,10 @@ function LocalModels() {
         Kokoro turns text into sounds with eSpeak NG, which is licensed under the GPL. It is downloaded
         together with the model rather than shipped inside Kificut.
       </p>
+      <p className="ai-dialog__fine">
+        Chatterbox Turbo imitates the voice in a recording. Only use your own voice or one you have the
+        speaker&apos;s permission for, and do not present what it says as their real words.
+      </p>
     </div>
   )
 }
@@ -94,6 +102,8 @@ function ModelRow({ model }: { model: LocalModelInfo }) {
   const state = status?.state ?? 'not-installed'
   const percent = status && status.total > 0 ? Math.min(100, (status.received / status.total) * 100) : 0
   const Icon = TASK_ICONS[model.task]
+  const support = useVoices((s) => s.support)
+  const unavailable = model.runtime === 'native' && support && !support.supported ? support.reason : null
 
   return (
     <div className="model-row">
@@ -109,6 +119,7 @@ function ModelRow({ model }: { model: LocalModelInfo }) {
           </span>
         </div>
         <p className="model-row__description">{model.description}</p>
+        {unavailable && state !== 'installed' && <p className="model-row__error">{unavailable}</p>}
         {state === 'downloading' && (
           <div className="model-row__progress">
             <div className="progress">
@@ -142,7 +153,13 @@ function ModelRow({ model }: { model: LocalModelInfo }) {
           </Button>
         )}
         {(state === 'not-installed' || state === 'error') && (
-          <Button size="sm" variant="primary" onClick={() => installModel(model.id)}>
+          <Button
+            size="sm"
+            variant="primary"
+            disabled={!!unavailable}
+            tip={unavailable ?? undefined}
+            onClick={() => installModel(model.id)}
+          >
             {state === 'error' ? 'Try Again' : 'Install'}
           </Button>
         )}

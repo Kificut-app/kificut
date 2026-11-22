@@ -1,4 +1,5 @@
 import { LOCAL_MODELS, type ModelTask } from '@shared/models'
+import { isCustomVoiceId } from '@shared/voices'
 import type { ToolResult } from '@shared/ai-tools'
 import { runTool } from '../ai/tools'
 import { useModels } from '../store/models'
@@ -18,6 +19,10 @@ const INSTALL_HINT: Record<ModelTask, { title: string; message: string }> = {
   voiceover: {
     title: 'Install the voice model first',
     message: 'Kokoro creates voiceovers on this computer. It is a one time download.'
+  },
+  'voice-clone': {
+    title: 'Install the custom voice model first',
+    message: 'Chatterbox Turbo speaks in your own voices on this computer. It is a one time download.'
   },
   transcription: {
     title: 'Install a speech model first',
@@ -95,8 +100,9 @@ export async function removeBackground(clipId: string, isVideo: boolean): Promis
 }
 
 export async function generateVoiceover(text: string, voice: string, speed: number): Promise<boolean> {
-  if (!hasModel('voiceover')) {
-    askToInstall('voiceover')
+  const task: ModelTask = isCustomVoiceId(voice) ? 'voice-clone' : 'voiceover'
+  if (!hasModel(task)) {
+    askToInstall(task)
     return false
   }
   return runWithToasts(
