@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
-import { Clock, FolderOpen, Plus, X } from 'lucide-react'
+import { Circle, Clock, FolderOpen, Plus, X } from 'lucide-react'
 import type { RecentProject } from '@shared/types'
 import { FRAME_RATES, RESOLUTION_PRESETS } from '../lib/factory'
 import { newProject, openProjectDialog, openProjectPath } from '../store/actions'
+import { setDialog } from '../store/editor'
 import { Button, NumberField, Select, cx } from './ui/controls'
 import { LogoMark } from './Logo'
-import { modKey } from '../lib/platform'
+import { modKey, shiftKey } from '../lib/platform'
 
 function relativeDate(iso: string): string {
   const then = new Date(iso).getTime()
@@ -135,9 +136,19 @@ export function Welcome() {
                   onChange={setFps}
                 />
               </div>
-              <Button variant="primary" size="lg" icon={<Plus size={16} />} onClick={create}>
-                Create Project
-              </Button>
+              <div className="welcome__buttons">
+                <Button variant="primary" size="lg" icon={<Plus size={16} />} onClick={create}>
+                  Create Project
+                </Button>
+                <Button
+                  size="lg"
+                  icon={<Circle size={13} fill="currentColor" className="welcome__record-dot" />}
+                  tip={`Record your screen, camera or both|${modKey}${shiftKey}R`}
+                  onClick={() => setDialog('record')}
+                >
+                  Record
+                </Button>
+              </div>
             </div>
           </div>
         </section>

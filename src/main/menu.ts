@@ -64,6 +64,7 @@ export function buildMenu(isDev: boolean): void {
       item('Save As…', 'save-as', 'CmdOrCtrl+Shift+S', true),
       { type: 'separator' },
       item('Import Media…', 'import-media', 'CmdOrCtrl+I', true),
+      item('New Recording…', 'new-recording', 'CmdOrCtrl+Shift+R', true),
       item('Export…', 'export', 'CmdOrCtrl+E', true),
       { type: 'separator' },
       item('Close Project', 'close-project', 'CmdOrCtrl+Shift+W', true),

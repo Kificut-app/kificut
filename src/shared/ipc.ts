@@ -3,6 +3,19 @@ import type { OverlayImage } from './ffmpeg-graph'
 import type { ToolResult } from './ai-tools'
 import type { ModelStatus } from './models'
 import type { CreateVoiceRequest, CustomVoice, VoiceSupport } from './voices'
+import type {
+  AreaRect,
+  CaptureSource,
+  DisplayInfo,
+  FileRole,
+  RecorderCommand,
+  RecorderSession,
+  RecorderStatus,
+  RecorderSummary,
+  RecorderSupport,
+  RecordingOptions,
+  RecordingResult
+} from './recording'
 import type { RecoverySnapshot, UpdateStatus } from './updates'
 import type { AssistantEvent, AssistantSettings, ProviderId, ProviderUpdate } from './assistant'
 import type {
@@ -51,6 +64,7 @@ export type MenuCommand =
   | 'shortcuts'
   | 'about'
   | 'check-updates'
+  | 'new-recording'
 
 export type ClaudeCodeResult =
   | { ok: true }
@@ -133,6 +147,42 @@ export interface KificutApi {
     pickFile(): Promise<string | null>
     onStatus(callback: (message: string) => void): () => void
     onChange(callback: (voices: CustomVoice[]) => void): () => void
+  }
+
+  /**
+   * Screen and camera recording. The editor window sets up and starts a recording; a small recorder
+   * window does the capturing and encoding and streams the files to the main process.
+   */
+  recorder: {
+    support(): Promise<RecorderSupport>
+    sources(): Promise<CaptureSource[]>
+    /** Lets the user drag out an area of a screen. Resolves null when cancelled. */
+    pickArea(displayId: number): Promise<AreaRect | null>
+    /** Asks for the camera where the system requires it (macOS). */
+    allowCamera(): Promise<boolean>
+    start(options: RecordingOptions): Promise<void>
+    command(command: RecorderCommand): Promise<void>
+    /** Opens the recordings folder, or shows a file in it. */
+    reveal(path?: string): Promise<void>
+    /** null when no recording is running. */
+    onStatus(callback: (status: RecorderStatus | null) => void): () => void
+    onResult(callback: (result: RecordingResult) => void): () => void
+    onError(callback: (message: string) => void): () => void
+    /** Recordings that were interrupted (for example by a crash) and have been saved since. */
+    onRecovered(callback: (paths: string[]) => void): () => void
+
+    /* Used by the recorder windows. */
+    session(): Promise<RecorderSession>
+    write(role: FileRole, position: number, data: Uint8Array): Promise<void>
+    report(status: RecorderStatus): void
+    layout(view: 'countdown' | 'bar' | 'hidden'): Promise<void>
+    finish(summary: RecorderSummary): Promise<void>
+    fail(message: string): Promise<void>
+    discarded(): Promise<void>
+    onCommand(callback: (command: RecorderCommand) => void): () => void
+    areaDisplay(): Promise<DisplayInfo>
+    areaDone(area: AreaRect | null): Promise<void>
+    cameraView(): Promise<{ deviceId: string; shape: 'circle' | 'wide' }>
   }
 
   /** FFmpeg work for the local AI features. */
@@ -297,6 +347,28 @@ export const IPC = {
   voicesPickFile: 'voices:pick-file',
   voicesStatus: 'voices:status',
   voicesChanged: 'voices:changed',
+  recorderSupport: 'recorder:support',
+  recorderSources: 'recorder:sources',
+  recorderPickArea: 'recorder:pick-area',
+  recorderAllowCamera: 'recorder:allow-camera',
+  recorderStart: 'recorder:start',
+  recorderCommand: 'recorder:command',
+  recorderReveal: 'recorder:reveal',
+  recorderStatus: 'recorder:status',
+  recorderResult: 'recorder:result',
+  recorderError: 'recorder:error',
+  recorderRecovered: 'recorder:recovered',
+  recorderSession: 'recorder:session',
+  recorderWrite: 'recorder:write',
+  recorderReport: 'recorder:report',
+  recorderLayout: 'recorder:layout',
+  recorderFinish: 'recorder:finish',
+  recorderFail: 'recorder:fail',
+  recorderDiscarded: 'recorder:discarded',
+  recorderToWindow: 'recorder:to-window',
+  recorderAreaDisplay: 'recorder:area-display',
+  recorderAreaDone: 'recorder:area-done',
+  recorderCameraView: 'recorder:camera-view',
   updatesStatus: 'updates:status',
   localAiSearchFrames: 'local-ai:search-frames',
   localAiReadIndex: 'local-ai:read-index',

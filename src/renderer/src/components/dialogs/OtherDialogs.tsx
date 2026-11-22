@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
+import { RECORDING_SHORTCUTS, shortcutLabel } from '@shared/recording'
 import { CircleAlert, CircleCheck, ExternalLink } from 'lucide-react'
 import type { AppSettings, ToolInfo } from '@shared/types'
 import { setDialog, useEditor } from '../../store/editor'
@@ -189,6 +190,14 @@ export function PreferencesDialog() {
 }
 
 const SHORTCUTS: Array<{ group: string; items: Array<[string, string]> }> = [
+  {
+    group: 'Recording',
+    items: [
+      ['New recording', `${modKey}${shiftKey}R`],
+      ['Pause / resume, anywhere while recording', shortcutLabel(RECORDING_SHORTCUTS.pause, isMac)],
+      ['Stop and save, anywhere while recording', shortcutLabel(RECORDING_SHORTCUTS.stop, isMac)]
+    ]
+  },
   {
     group: 'Playback',
     items: [

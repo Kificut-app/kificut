@@ -25,6 +25,13 @@ import { cancelModelInstall, installModel, listModelStatus, modelsDir, removeMod
 import { registerAssistantIpc } from './assistant'
 import { registerVoiceIpc } from './voices'
 import { integrateAppImage } from './linux-desktop'
+import {
+  confirmCloseWhileRecording,
+  isRecording,
+  recoverRecordings,
+  registerRecorderIpc,
+  stopBeforeQuit
+} from './recorder'
 import { stopVoiceEngine } from './voice-engine'
 import { VOICE_CLONE_MODEL } from '@shared/voices'
 import { checkForUpdates, installUpdate, startUpdater, updateStatus } from './updater'
@@ -133,6 +140,10 @@ function createWindow(): BrowserWindow {
   win.on('close', (event) => {
     const state = windowState.get(win)
     if (!state || state.forceClose) return
+    if (isRecording() && confirmCloseWhileRecording(win)) {
+      event.preventDefault()
+      return
+    }
     if (isExporting()) {
       const choice = dialog.showMessageBoxSync(win, {
         type: 'warning',
@@ -159,6 +170,13 @@ function createWindow(): BrowserWindow {
       win.webContents.send(IPC.appOpenProject, pendingOpenPath)
       pendingOpenPath = null
     }
+    // Recordings cut short by a crash or a forced quit are saved and reported once.
+    if (!recoveryChecked && !isRecording()) {
+      recoveryChecked = true
+      void recoverRecordings().then((paths) => {
+        if (paths.length > 0 && !win.isDestroyed()) win.webContents.send(IPC.recorderRecovered, paths)
+      })
+    }
   })
 
   if (isDev) {
@@ -168,6 +186,8 @@ function createWindow(): BrowserWindow {
   }
   return win
 }
+
+let recoveryChecked = false
 
 function senderWindow(event: Electron.IpcMainInvokeEvent | Electron.IpcMainEvent): BrowserWindow | null {
   return BrowserWindow.fromWebContents(event.sender)
@@ -223,6 +243,7 @@ function registerIpc(): void {
 
   registerAssistantIpc()
   registerVoiceIpc()
+  registerRecorderIpc()
 
   ipcMain.handle(IPC.updatesGet, () => updateStatus())
   ipcMain.handle(IPC.updatesCheck, () => checkForUpdates(true))
@@ -448,6 +469,10 @@ if (isMcpServerMode()) {
     })
   })
 
+  app.on('before-quit', (event) => {
+    // Save a recording in progress first; the app quits once it is saved.
+    if (stopBeforeQuit()) event.preventDefault()
+  })
   app.on('will-quit', () => stopConnector(true))
 
   app.on('window-all-closed', () => {

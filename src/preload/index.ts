@@ -4,6 +4,7 @@ import type { ExportProgress } from '@shared/export-formats'
 import type { AiStatus, ProxyStatus } from '@shared/types'
 import type { ModelStatus } from '@shared/models'
 import type { CustomVoice } from '@shared/voices'
+import type { RecorderCommand, RecorderStatus, RecordingResult } from '@shared/recording'
 import type { AssistantEvent } from '@shared/assistant'
 import type { UpdateStatus } from '@shared/updates'
 
@@ -73,6 +74,31 @@ const api: KificutApi = {
     pickFile: () => ipcRenderer.invoke(IPC.voicesPickFile),
     onStatus: (callback) => subscribe<[string]>(IPC.voicesStatus, callback),
     onChange: (callback) => subscribe<[CustomVoice[]]>(IPC.voicesChanged, callback)
+  },
+
+  recorder: {
+    support: () => ipcRenderer.invoke(IPC.recorderSupport),
+    sources: () => ipcRenderer.invoke(IPC.recorderSources),
+    pickArea: (displayId) => ipcRenderer.invoke(IPC.recorderPickArea, displayId),
+    allowCamera: () => ipcRenderer.invoke(IPC.recorderAllowCamera),
+    start: (options) => ipcRenderer.invoke(IPC.recorderStart, options),
+    command: (command) => ipcRenderer.invoke(IPC.recorderCommand, command),
+    reveal: (path) => ipcRenderer.invoke(IPC.recorderReveal, path),
+    onStatus: (callback) => subscribe<[RecorderStatus | null]>(IPC.recorderStatus, callback),
+    onResult: (callback) => subscribe<[RecordingResult]>(IPC.recorderResult, callback),
+    onError: (callback) => subscribe<[string]>(IPC.recorderError, callback),
+    onRecovered: (callback) => subscribe<[string[]]>(IPC.recorderRecovered, callback),
+    session: () => ipcRenderer.invoke(IPC.recorderSession),
+    write: (role, position, data) => ipcRenderer.invoke(IPC.recorderWrite, role, position, data),
+    report: (status) => ipcRenderer.send(IPC.recorderReport, status),
+    layout: (view) => ipcRenderer.invoke(IPC.recorderLayout, view),
+    finish: (summary) => ipcRenderer.invoke(IPC.recorderFinish, summary),
+    fail: (message) => ipcRenderer.invoke(IPC.recorderFail, message),
+    discarded: () => ipcRenderer.invoke(IPC.recorderDiscarded),
+    onCommand: (callback) => subscribe<[RecorderCommand]>(IPC.recorderToWindow, callback),
+    areaDisplay: () => ipcRenderer.invoke(IPC.recorderAreaDisplay),
+    areaDone: (area) => ipcRenderer.invoke(IPC.recorderAreaDone, area),
+    cameraView: () => ipcRenderer.invoke(IPC.recorderCameraView)
   },
 
   localAi: {

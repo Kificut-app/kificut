@@ -202,6 +202,9 @@ export function useMenuCommands(): void {
         case 'check-updates':
           void checkForUpdates()
           return
+        case 'new-recording':
+          setDialog('record')
+          return
       }
       if (!hasProject) return
       switch (command) {

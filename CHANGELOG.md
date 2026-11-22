@@ -8,9 +8,11 @@ All notable changes to this project are documented here. The format follows [Kee
 
 - Linux release: an AppImage for x86_64 attached to each release, with in-app updates. It uses the static AppImage runtime, so it does not need libfuse2, and starts without Chromium's sandbox where the system blocks it
 - The Linux AppImage adds itself to the applications menu with its icon and the .kificut file type, and keeps the entry pointing at the AppImage after updates. Wayland desktops need this before they allow screen recording and global shortcuts. Set `KIFICUT_NO_DESKTOP_INTEGRATION=1` to skip it
+- Recording and custom voices on Linux: screen, camera and both on X11 and Wayland (where the desktop's own dialog picks the screen or window), in the AppImage
 - Claude Code on Linux: the AppImage runs the connector itself with `--mcp-server`, and Kificut points Claude Code at the new file when an update or a move changes the AppImage's path
 - My voices: voiceovers in your own voice, or a voice you have permission to use, from a recording of 10 to 20 seconds. Record in the Voice tab, use the selected clip or pick a file, confirm the voice may be used, and pick it for any script. Chatterbox Turbo (725 MB, MIT) runs on this computer in a background process with the native ONNX Runtime; nothing is trained or uploaded. Not available on Intel Macs yet
 - Tools for assistants: `list_voices`, and `generate_voiceover` takes the user's own voices
+- Recording: the screen, a camera, or both at once, from the red dot in the top bar, the start screen or Ctrl+Shift+R. Record a whole screen, a window or an area you drag out, at up to 4K or full resolution and 30 or 60 fps, with a microphone (level meter, noise reduction) and, on Windows, the computer's sound. A countdown, pause and resume, a floating control bar, a tray icon and global shortcuts (Ctrl+Shift+1 to pause, Ctrl+Shift+2 to stop). The screen and the camera are separate MP4 files in sync with each other; the recording is added to the timeline with the camera as a picture in picture over the screen, on free tracks and linked. Files are written while recording, and a recording cut short by a crash is saved at the next start
 
 ### Fixed
 

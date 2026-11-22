@@ -41,6 +41,10 @@ extraResources:
       - ffmpeg.LICENSE
   - from: LICENSE
     to: licenses/LICENSE
+  # Mediabunny (MPL-2.0) writes the MP4 files of screen and camera recordings. Its source is at
+  # https://github.com/Vanilagy/mediabunny; Kificut uses it unmodified.
+  - from: node_modules/mediabunny/LICENSE
+    to: licenses/mediabunny.LICENSE
   # The Claude Desktop connector, opened by Settings > Claude > Install in Claude Desktop.
   - from: connectors/claude/dist
     to: connectors
@@ -61,7 +65,8 @@ mac:
   category: public.app-category.video
   icon: build/icon.png
   extendInfo:
-    NSMicrophoneUsageDescription: Kificut uses the microphone when you record your voice for voiceovers in your own voice.
+    NSMicrophoneUsageDescription: Kificut uses the microphone when you record your voice, for voiceovers and recordings.
+    NSCameraUsageDescription: Kificut uses the camera when you record yourself, alone or together with your screen.
   hardenedRuntime: true
   gatekeeperAssess: false
   entitlements: build/entitlements.mac.plist

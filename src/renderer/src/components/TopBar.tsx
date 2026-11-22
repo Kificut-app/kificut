@@ -1,13 +1,27 @@
 import { useEffect, useRef, useState } from 'react'
-import { ArrowDownCircle, Download, Loader2, Redo2, Settings, Sparkles, Undo2 } from 'lucide-react'
+import {
+  ArrowDownCircle,
+  Circle,
+  Download,
+  Loader2,
+  Pause,
+  Play,
+  Redo2,
+  Settings,
+  Sparkles,
+  Square,
+  Undo2
+} from 'lucide-react'
 import { isDirty, redo, setDialog, undo, useEditor } from '../store/editor'
 import { renameProject, saveProject } from '../store/actions'
 import { useUi } from '../store/ui'
 import { openAiDialog } from './dialogs/AiDialog'
 import { installUpdate, useUpdates } from '../store/updates'
+import { useRecording } from '../store/recording'
+import { formatClock } from '@shared/recording'
 import { Button, IconButton, cx } from './ui/controls'
 import { LogoMark } from './Logo'
-import { modKey } from '../lib/platform'
+import { modKey, shiftKey } from '../lib/platform'
 
 export function TopBar() {
   const project = useEditor((s) => s.project)
@@ -40,6 +54,7 @@ export function TopBar() {
 
           <div className="topbar__spacer" />
 
+          <RecordingChip />
           <TaskChip />
           <AiChip />
           <UpdateButton />
@@ -54,6 +69,9 @@ export function TopBar() {
               disabled={!canRedo}
             >
               <Redo2 size={16} />
+            </IconButton>
+            <IconButton tip={`New recording|${modKey}${shiftKey}R`} onClick={() => setDialog('record')}>
+              <Circle size={14} className="topbar__record" fill="currentColor" />
             </IconButton>
             <IconButton tip="AI models and assistant" onClick={() => openAiDialog()}>
               <Sparkles size={16} />
@@ -73,8 +91,61 @@ export function TopBar() {
           </div>
         </>
       )}
-      {!project && <div className="topbar__spacer" />}
+      {!project && (
+        <>
+          <div className="topbar__spacer" />
+          <RecordingChip />
+        </>
+      )}
     </header>
+  )
+}
+
+/** The recording in progress, with pause and stop, for when the Kificut window is in view. */
+function RecordingChip() {
+  const status = useRecording((s) => s.status)
+  if (!status) return null
+  const { phase } = status
+  const paused = phase === 'paused'
+  const live = phase === 'recording' || paused
+  const label =
+    phase === 'saving'
+      ? 'Saving recording'
+      : phase === 'countdown'
+        ? `Recording in ${status.countdown}`
+        : phase === 'preparing'
+          ? 'Getting ready'
+          : formatClock(status.elapsed)
+  return (
+    <div className={cx('rec-chip', paused && 'is-paused')}>
+      {phase === 'saving' || phase === 'preparing' ? (
+        <Loader2 size={13} className="spin" />
+      ) : (
+        <span className="rec-chip__dot" />
+      )}
+      <span className="rec-chip__label">{label}</span>
+      {live && (
+        <button
+          type="button"
+          className="rec-chip__button"
+          data-tip={paused ? 'Resume recording' : 'Pause recording'}
+          onClick={() => void window.kificut.recorder.command('toggle-pause')}
+        >
+          {paused ? <Play size={12} /> : <Pause size={12} />}
+        </button>
+      )}
+      {phase !== 'saving' && (
+        <button
+          type="button"
+          className="rec-chip__button rec-chip__stop"
+          data-tip="Stop and save"
+          onClick={() => void window.kificut.recorder.command('stop')}
+        >
+          <Square size={10} fill="currentColor" />
+          Stop
+        </button>
+      )}
+    </div>
   )
 }
 

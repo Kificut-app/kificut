@@ -26,6 +26,14 @@ Kificut is a multi-track editor built on Electron and FFmpeg. The preview is dra
 - Fade in and out on any clip, per clip volume in dB, speed from 10% to 1600% with pitch kept
 - Stereo output meter
 
+**Recording**
+
+- Record the screen, a camera, or both at once, straight into the timeline. With both, the camera lands as a picture in picture over the screen, on its own track, so it stays movable and editable
+- A whole screen, one window, or an area you drag out; up to 4K or full resolution at 30 or 60 fps
+- Microphone with a level meter and noise reduction, plus the computer's own sound on Windows
+- Countdown, pause and resume, a floating control bar, a tray icon and global shortcuts, so recording can be stopped from anywhere
+- The screen and the camera are separate MP4 files (H.264 and AAC) in sync with each other, saved as they record so a crash loses only the last couple of seconds
+
 **AI, on your terms**
 
 - Voiceovers from a script with Kokoro, 28 natural English voices, or in your own voice from a recording of 10 to 20 seconds, generated on your computer
@@ -57,6 +65,29 @@ chmod +x Kificut-*-linux-x86_64.AppImage
 It runs on most 64-bit distributions from the last few years and updates itself like the other versions. It uses FUSE to mount itself (the `fusermount` command, which desktop installs include); without FUSE, start it with `--appimage-extract-and-run`. On systems that block Chromium's sandbox (such as Ubuntu 24.04 and later), it starts without it automatically.
 
 When it starts, Kificut adds itself to your applications menu with its icon and opens `.kificut` projects on a double click: it writes `kificut.desktop`, icons and the project file type under `~/.local/share`, and keeps them pointing at the AppImage when an update renames it. Wayland desktops also need this entry before they let an app record the screen or use global shortcuts. If the AppImage is deleted, the menu entry hides itself. To skip this, start Kificut with `KIFICUT_NO_DESKTOP_INTEGRATION=1`; an entry you wrote yourself is never changed.
+
+## Recording
+
+Click the red dot in the top bar, choose **Record** on the start screen, or press Ctrl+Shift+R (Cmd+Shift+R).
+
+- **Screen**: pick a whole screen or a window from live thumbnails. For a screen, **Select Area…** lets you drag out the part to record.
+- **Camera**: pick a camera and see it before you start.
+- **Screen and Camera**: both at once. Pick the corner and size the camera goes in; you can change both later in the editor like any clip.
+
+Choose a microphone (with a level meter), whether to reduce background noise, and on Windows whether to record the computer's sound. Quality settings cover the screen resolution (full, 4K, 1440p, 1080p or 720p), the camera resolution, 30 or 60 fps, and standard or high quality. The dialog shows the free disk space and roughly how many hours fit at those settings.
+
+While recording, a small bar shows the time and the microphone level, with pause, stop and discard. The same controls are in the tray (the menu bar on macOS, with the time next to the icon) and on global shortcuts that work in any app: **Ctrl+Shift+1** (Cmd+Shift+1) to pause or resume and **Ctrl+Shift+2** (Cmd+Shift+2) to stop. Kificut can minimize itself while it records the screen, keeps the display awake, and stops and saves on its own if the disk is nearly full.
+
+When you stop, the recording is added at the playhead, or as a new project the size of the recording if none is open. The screen, the camera and the sound go on free tracks, so nothing already in the project is overwritten, and they are linked so they move, trim and split together (unlink them to move one alone).
+
+Files are saved in `Documents/Kificut/Recordings`: one MP4 for the screen and one for the camera (H.264 video at the frame rate you chose, AAC sound), all starting at the same instant. The microphone is recorded with the camera, or with the screen when there is no camera. They are written while you record, so if Kificut or the computer stops unexpectedly, the next start saves what was recorded and tells you.
+
+Notes:
+
+- On Windows 10 (2004 and later) and Windows 11, the control bar and the camera preview stay out of screen recordings. macOS and Linux cannot keep them out, so when you record a whole screen there Kificut turns them off by default; use the tray icon or the shortcuts instead, or record a window.
+- macOS asks once for permission to record the screen, the camera and the microphone. If you said no, turn Kificut on under System Settings > Privacy & Security, then open it again.
+- On Linux, recording works on X11 and on Wayland (the default on Ubuntu and Fedora). On Wayland your desktop's own dialog asks which screen or window to record when you start, so Kificut shows no list of screens, recording an area is not available, and Wayland decides where the control bar goes. The tray icon needs a desktop that shows tray icons (GNOME needs the AppIndicator extension, which Ubuntu includes); the top bar of the Kificut window always has Stop and Pause too.
+- Recording the computer's sound needs Windows; Electron cannot capture it on macOS or Linux yet.
 
 ## AI features
 
@@ -194,6 +225,8 @@ When you export, text layers are rendered to PNG in the renderer and the main pr
 | Add marker                      | M                                                 |
 | Zoom timeline                   | = and -, Shift+Z to fit, Ctrl+scroll at the mouse |
 | Duplicate a clip while dragging | Hold Alt (Option)                                 |
+| New recording                   | Ctrl+Shift+R (Cmd+Shift+R)                        |
+| Pause or stop a recording       | Ctrl+Shift+1, Ctrl+Shift+2, in any app            |
 
 The full list is under Help > Keyboard Shortcuts.
 
@@ -219,4 +252,4 @@ Bug reports, ideas and pull requests are all welcome. [CONTRIBUTING.md](CONTRIBU
 
 Kificut is released under the [MIT license](LICENSE).
 
-The installers include FFmpeg and FFprobe builds published by the `ffmpeg-static` project. They run as separate programs and are distributed under their own license (GPL, since the builds include x264 and x265); a copy is included with the app and the source is available from [ffmpeg.org](https://ffmpeg.org). The Inter typeface is used under the SIL Open Font License.
+Recordings are written with [Mediabunny](https://github.com/Vanilagy/mediabunny), used unmodified under the Mozilla Public License 2.0; its license is included with the app. The installers include FFmpeg and FFprobe builds published by the `ffmpeg-static` project. They run as separate programs and are distributed under their own license (GPL, since the builds include x264 and x265); a copy is included with the app and the source is available from [ffmpeg.org](https://ffmpeg.org). The Inter typeface is used under the SIL Open Font License.

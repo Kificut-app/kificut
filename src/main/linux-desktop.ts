@@ -36,7 +36,7 @@ export function desktopEntry(appImage: string, version: string): string {
     'Type=Application',
     'Name=Kificut',
     'GenericName=Video Editor',
-    'Comment=Edit videos on a multi-track timeline',
+    'Comment=Edit videos and record your screen and camera',
     `Exec=${execArgument(appImage)} %U`,
     // Desktops hide the entry once the AppImage is gone.
     `TryExec=${stringValue(appImage)}`,
@@ -45,7 +45,7 @@ export function desktopEntry(appImage: string, version: string): string {
     'StartupWMClass=kificut',
     'MimeType=application/x-kificut-project;',
     'Categories=AudioVideo;Video;AudioVideoEditing;',
-    'Keywords=video;editor;',
+    'Keywords=video;editor;screen;recorder;',
     `X-AppImage-Version=${version}`,
     MARKER,
     ''

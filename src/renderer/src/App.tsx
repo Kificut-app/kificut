@@ -7,6 +7,7 @@ import { Welcome } from './components/Welcome'
 import { Workspace } from './components/Workspace'
 import { ExportDialog } from './components/dialogs/ExportDialog'
 import { AiDialog } from './components/dialogs/AiDialog'
+import { RecordDialog } from './components/dialogs/RecordDialog'
 import { AboutDialog, PreferencesDialog, ShortcutsDialog } from './components/dialogs/OtherDialogs'
 import { BusyLayer, ConfirmLayer, ContextMenuLayer, ToastLayer } from './components/ui/overlays'
 import { TooltipLayer } from './components/ui/Tooltip'
@@ -30,6 +31,7 @@ export function App() {
       {dialog === 'shortcuts' && <ShortcutsDialog />}
       {dialog === 'about' && <AboutDialog />}
       {dialog === 'ai' && <AiDialog />}
+      {dialog === 'record' && <RecordDialog />}
 
       <ContextMenuLayer />
       <ConfirmLayer />

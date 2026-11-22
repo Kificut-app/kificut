@@ -37,6 +37,15 @@ export default defineConfig({
       }
     },
     plugins: [react()],
-    worker: { format: 'es' }
+    worker: { format: 'es' },
+    build: {
+      rolldownOptions: {
+        input: {
+          index: resolve(__dirname, 'src/renderer/index.html'),
+          // The recorder's floating windows (see src/main/recorder.ts).
+          recorder: resolve(__dirname, 'src/renderer/recorder.html')
+        }
+      }
+    }
   }
 })

@@ -291,7 +291,7 @@ export async function removeMedia(mediaId: string): Promise<void> {
 /* Tracks */
 
 /** Adds a track above the existing ones of its kind and returns its id. */
-function appendTrack(draft: Draft<Project>, kind: TrackKind): string {
+export function appendTrack(draft: Draft<Project>, kind: TrackKind): string {
   const prefix = kind === 'video' ? 'V' : 'A'
   const highest = Math.max(
     0,
