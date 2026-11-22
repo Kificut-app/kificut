@@ -75,8 +75,14 @@ nsis:
   createDesktopShortcut: true
   shortcutName: Kificut
 
+# The static AppImage runtime, which needs no libfuse2 (missing by default on Ubuntu 22.04 and later).
+toolsets:
+  appimage: '1.0.3'
+
 linux:
   icon: build/icon.png
+  # Lets the desktop match Kificut's windows to its launcher icon.
+  syncDesktopName: true
   category: AudioVideo
   target:
     - AppImage

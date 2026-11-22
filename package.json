@@ -1,8 +1,9 @@
 {
   "name": "kificut",
   "productName": "Kificut",
+  "desktopName": "kificut.desktop",
   "version": "0.3.0",
-  "description": "A fast, open source video editor for Windows and macOS.",
+  "description": "A fast, open source video editor for Windows, macOS and Linux.",
   "license": "MIT",
   "author": "Kificut contributors",
   "homepage": "https://github.com/Kificut-app/kificut",

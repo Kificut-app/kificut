@@ -92,6 +92,12 @@ To add a tool, define it in `ai-tools.ts`, implement it in `ai/tools.ts` (a test
 
 `src/main/claude-code.ts` registers the same MCP server the Desktop bundle uses (shipped unpacked as `resources/connectors/kificut-mcp.js`). It runs with Kificut's own executable and `ELECTRON_RUN_AS_NODE=1`, so no separate Node.js is needed, and the connector removes that variable before it starts Kificut itself. The `claude` command is looked up on PATH, in the usual install folders and inside the VS Code, Cursor and Windsurf extensions, then `claude mcp add kificut ... --scope user` is run after removing any older entry.
 
+## Linux
+
+Linux ships as an AppImage built with electron-builder's static runtime (`toolsets.appimage` in `electron-builder.yml`), which needs `fusermount` but not `libfuse2`. Its launcher adds `--no-sandbox` only where unprivileged user namespaces are blocked, as on Ubuntu 24.04. Inside an AppImage the executable lives in a temporary mount and Node mode does not accept the launcher's `--no-sandbox`, so Claude Code is registered as `Kificut.AppImage --mcp-server` (`src/main/mcp-mode.ts` runs the connector in the main process without opening a window), connector.json launches the AppImage itself, and `refreshClaudeCodeRegistration` points Claude Code at the new file when an update renames the AppImage.
+
+On each start inside an AppImage, `src/main/linux-desktop.ts` writes `~/.local/share/applications/kificut.desktop` (Exec and TryExec pointing at `$APPIMAGE`, marked `X-Kificut-Managed` so a user's own entry is left alone), icons resized from the AppImage's `kificut.png` into `icons/hicolor`, and the `application/x-kificut-project` type, then runs `update-desktop-database` and `update-mime-database` when they exist. Besides the menu entry and the dock icon, this is the app's identity for Wayland portals: `desktopName` (`kificut`) must match an installed desktop file, or GNOME and xdg-desktop-portal 1.21 and later refuse screen capture and global shortcuts.
+
 ## Local AI models
 
 Kokoro (text to speech) and Whisper (speech to text) run in a module worker in the renderer (`src/renderer/src/local-ai/worker.ts`) with transformers.js and ONNX Runtime Web.

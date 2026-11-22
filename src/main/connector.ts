@@ -45,6 +45,8 @@ function infoPath(): string {
 
 function launchCommand(): ConnectorInfo['launch'] {
   if (!app.isPackaged) return null
+  // Inside an AppImage the executable sits in a temporary mount; start the AppImage itself.
+  if (process.env.APPIMAGE) return { command: process.env.APPIMAGE, args: [] }
   if (process.platform === 'darwin') {
     // Launch through LaunchServices so the app gets its Dock icon and comes to the front.
     const bundle = process.execPath.replace(/\/Contents\/MacOS\/[^/]+$/, '')

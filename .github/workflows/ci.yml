@@ -47,6 +47,10 @@ jobs:
             os: macos-latest
             args: --mac --x64
             expect: x86_64
+          - name: Linux x64
+            id: linux-x64
+            os: ubuntu-latest
+            args: --linux --x64
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
@@ -95,6 +99,12 @@ jobs:
             codesign --verify --deep --verbose=1 "$app"
             test -f "$app"/Contents/Resources/connectors/*.mcpb
             test -f "$app"/Contents/Resources/connectors/kificut-mcp.js
+          elif [ "$RUNNER_OS" = "Linux" ]; then
+            ls -l release/*/linux-unpacked/resources/bin
+            test -f release/*/linux-unpacked/resources/connectors/kificut-mcp.js
+            test -f release/*/linux-unpacked/resources/app-update.yml
+            test -f release/*/latest-linux.yml
+            ls release/*/*.AppImage
           else
             ls -l release/*/win-unpacked/resources/bin
             test -f release/*/win-unpacked/resources/connectors/*.mcpb
@@ -105,7 +115,9 @@ jobs:
             test -f release/*/win-unpacked/resources/bin/ffprobe.exe
           fi
           # Noise reduction needs the arnndn filter, and background removal for video needs libvpx.
-          if [ "$RUNNER_OS" = "macOS" ]; then ffmpeg="$app/Contents/Resources/bin/ffmpeg"; else ffmpeg=$(ls release/*/win-unpacked/resources/bin/ffmpeg.exe); fi
+          if [ "$RUNNER_OS" = "macOS" ]; then ffmpeg="$app/Contents/Resources/bin/ffmpeg"
+          elif [ "$RUNNER_OS" = "Linux" ]; then ffmpeg=$(ls release/*/linux-unpacked/resources/bin/ffmpeg)
+          else ffmpeg=$(ls release/*/win-unpacked/resources/bin/ffmpeg.exe); fi
           if "$ffmpeg" -version > /dev/null 2>&1; then
             "$ffmpeg" -hide_banner -filters | grep -q ' arnndn ' || { echo "::error::FFmpeg has no arnndn filter"; exit 1; }
             "$ffmpeg" -hide_banner -encoders | grep -q ' libvpx-vp9 ' || { echo "::error::FFmpeg has no libvpx-vp9 encoder"; exit 1; }
@@ -122,6 +134,8 @@ jobs:
             release/*/*.zip
             release/*/latest.yml
             release/*/*.exe.blockmap
+            release/*/*.AppImage
+            release/*/latest-linux.yml
             connectors/claude/dist/*.mcpb
           if-no-files-found: error
 
@@ -151,7 +165,7 @@ jobs:
           These builds are not code signed yet. On macOS, try to open the app once, then go to System Settings > Privacy & Security and choose Open Anyway. On Windows, choose More info and then Run anyway if SmartScreen asks.
           EOF
           # Artifacts keep their release/<version>/ folders, so collect the installer files themselves.
-          mapfile -t files < <(find dist -type f \( -name '*.exe' -o -name '*.dmg' -o -name '*.zip' -o -name '*.mcpb' -o -name 'latest.yml' -o -name '*.exe.blockmap' \) | sort)
+          mapfile -t files < <(find dist -type f \( -name '*.exe' -o -name '*.dmg' -o -name '*.zip' -o -name '*.mcpb' -o -name 'latest.yml' -o -name '*.exe.blockmap' -o -name '*.AppImage' -o -name 'latest-linux.yml' \) | sort)
           printf '%s\n' "${files[@]}"
           if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
             # A re-run of this job attaches the files to the draft created earlier.

@@ -1,14 +1,16 @@
 import { app } from 'electron'
 import { execFile } from 'node:child_process'
-import { existsSync, readdirSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { delimiter, join } from 'node:path'
 import type { ClaudeCodeResult } from '@shared/ipc'
 import { isNewerVersion } from '@shared/updates'
+import { MCP_SERVER_FLAG } from './mcp-mode'
 
 /*
  * Connects Kificut to Claude Code. Claude Code runs the same MCP server as the Claude Desktop
- * bundle, started with Kificut's own executable in Node mode, so no separate Node.js is needed.
- * Registering goes through the `claude mcp add` command, at user scope so it works in every folder.
+ * bundle, started with Kificut's own executable (in Node mode, or in server mode for a Linux
+ * AppImage), so no separate Node.js is needed. Registering goes through the `claude mcp add`
+ * command, at user scope so it works in every folder.
  */
 
 const SERVER_NAME = 'kificut'
@@ -20,26 +22,53 @@ function serverScript(): string | null {
   return existsSync(path) ? path : null
 }
 
-function addArgs(script: string): string[] {
-  return [
-    'mcp',
-    'add',
-    SERVER_NAME,
-    process.execPath,
-    script,
-    '--scope',
-    'user',
-    '--env',
-    'ELECTRON_RUN_AS_NODE=1'
-  ]
+interface Registration {
+  /** The executable Claude Code will start, to notice later when it moves. */
+  command: string
+  /** Arguments for `claude`; paths are marked so the manual command can quote them. */
+  args: Array<{ value: string; path?: boolean }>
+}
+
+const plain = (...values: string[]) => values.map((value) => ({ value }))
+
+/** How Claude Code should start the Kificut server on this install. */
+function registration(): Registration | null {
+  const appImage = process.env.APPIMAGE
+  if (appImage) {
+    // Linux AppImage: run the AppImage itself in server mode (see mcp-mode.ts).
+    return {
+      command: appImage,
+      args: [
+        ...plain('mcp', 'add', SERVER_NAME, '--scope', 'user', '--'),
+        { value: appImage, path: true },
+        ...plain(MCP_SERVER_FLAG)
+      ]
+    }
+  }
+  const script = serverScript()
+  if (!script) return null
+  // Everywhere else Kificut's executable runs the server script in Node mode.
+  return {
+    command: process.execPath,
+    args: [
+      ...plain('mcp', 'add', SERVER_NAME),
+      { value: process.execPath, path: true },
+      { value: script, path: true },
+      ...plain('--scope', 'user', '--env', 'ELECTRON_RUN_AS_NODE=1')
+    ]
+  }
 }
 
 /** The command to paste into a terminal when Kificut cannot run it itself. */
-function manualCommand(script: string): string {
+function manualCommand(entry: Registration): string {
   const quote =
     process.platform === 'win32' ? (s: string) => `"${s}"` : (s: string) => `'${s.replace(/'/g, `'\\''`)}'`
-  const [, , name, command, path, ...rest] = addArgs(script)
-  return ['claude', 'mcp', 'add', name, quote(command), quote(path), ...rest].join(' ')
+  return ['claude', ...entry.args.map((a) => (a.path ? quote(a.value) : a.value))].join(' ')
+}
+
+/** Remembers which executable Claude Code was pointed at. */
+function registrationFile(): string {
+  return join(app.getPath('userData'), 'claude-code.json')
 }
 
 /** Claude Code's own copy inside the VS Code (or Cursor, Windsurf) extension, newest first. */
@@ -131,15 +160,19 @@ async function findClaude(): Promise<string | null> {
 }
 
 export async function connectClaudeCode(): Promise<ClaudeCodeResult> {
-  const script = serverScript()
-  if (!script) throw new Error('This build does not include the Kificut server for Claude Code.')
-  const command = manualCommand(script)
+  const entry = registration()
+  if (!entry) throw new Error('This build does not include the Kificut server for Claude Code.')
+  const command = manualCommand(entry)
   const claude = await findClaude()
   if (!claude) return { ok: false, reason: 'not-found', command }
   // Replace an earlier registration, which may point at an old copy of Kificut.
   await run(claude, ['mcp', 'remove', SERVER_NAME, '--scope', 'user']).catch(() => undefined)
   try {
-    await run(claude, addArgs(script))
+    await run(
+      claude,
+      entry.args.map((a) => a.value)
+    )
+    writeFileSync(registrationFile(), JSON.stringify({ command: entry.command }))
     return { ok: true }
   } catch (error) {
     return {
@@ -149,4 +182,20 @@ export async function connectClaudeCode(): Promise<ClaudeCodeResult> {
       error: error instanceof Error ? error.message : String(error)
     }
   }
+}
+
+/**
+ * When Kificut was connected to Claude Code from an executable that has since moved (an AppImage
+ * renamed by an update, or moved by the user), connects again from the current one.
+ */
+export async function refreshClaudeCodeRegistration(): Promise<void> {
+  let previous: { command?: string }
+  try {
+    previous = JSON.parse(readFileSync(registrationFile(), 'utf8')) as { command?: string }
+  } catch {
+    return
+  }
+  const current = registration()
+  if (!current || previous.command === current.command) return
+  await connectClaudeCode().catch(() => undefined)
 }

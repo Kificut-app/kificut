@@ -1,10 +1,10 @@
 # Kificut
 
-A free and open source video editor for Windows and macOS.
+A free and open source video editor for Windows, macOS and Linux.
 
 ![Kificut editing a short reel](docs/screenshot.png)
 
-Kificut is a multi-track editor built on Electron and FFmpeg. The preview is drawn on the GPU in real time and exports go straight through FFmpeg, so what you see while editing is what ends up in the file. It also runs on Linux, though Windows and macOS are the main targets.
+Kificut is a multi-track editor built on Electron and FFmpeg. The preview is drawn on the GPU in real time and exports go straight through FFmpeg, so what you see while editing is what ends up in the file. It runs on Windows, macOS and Linux.
 
 ## Features
 
@@ -43,9 +43,20 @@ See [AI features](#ai-features) for what runs where.
 
 ## Download
 
-Installers for Windows and macOS are attached to each [release](https://github.com/Kificut-app/kificut/releases).
+Installers for Windows and macOS, and an AppImage for Linux, are attached to each [release](https://github.com/Kificut-app/kificut/releases).
 
 Release builds are not code signed yet. On macOS, try to open the app once, then go to System Settings > Privacy & Security and choose Open Anyway. On Windows, choose "More info" and then "Run anyway" if SmartScreen asks.
+
+On Linux, make the AppImage executable and run it:
+
+```sh
+chmod +x Kificut-*-linux-x86_64.AppImage
+./Kificut-*-linux-x86_64.AppImage
+```
+
+It runs on most 64-bit distributions from the last few years and updates itself like the other versions. It uses FUSE to mount itself (the `fusermount` command, which desktop installs include); without FUSE, start it with `--appimage-extract-and-run`. On systems that block Chromium's sandbox (such as Ubuntu 24.04 and later), it starts without it automatically.
+
+When it starts, Kificut adds itself to your applications menu with its icon and opens `.kificut` projects on a double click: it writes `kificut.desktop`, icons and the project file type under `~/.local/share`, and keeps them pointing at the AppImage when an update renames it. Wayland desktops also need this entry before they let an app record the screen or use global shortcuts. If the AppImage is deleted, the menu entry hides itself. To skip this, start Kificut with `KIFICUT_NO_DESKTOP_INTEGRATION=1`; an entry you wrote yourself is never changed.
 
 ## AI features
 
@@ -120,6 +131,7 @@ If Kificut cannot find Claude Code, it shows the command to paste into a termina
 Kificut checks for new versions in the background (you can turn this off in Settings, under Updates, or check by hand from the Help menu, or the Kificut menu on a Mac).
 
 - **Windows**: the update downloads while you work. Click **Restart to Update** in the top bar, or just quit, and it installs itself. No new installer to download.
+- **Linux** (AppImage): the same as Windows. The AppImage is replaced with the new version when you restart.
 - **macOS**: until release builds are signed with an Apple Developer ID, macOS does not let the app replace itself. Kificut downloads the right installer for your Mac, checks it, and opens it when you click **Install Update**; drag Kificut into Applications to finish.
 
 Either way you do not lose work. While you edit, Kificut keeps a recovery copy of unsaved changes and brings them back after an update, without asking. If Kificut closes unexpectedly (a crash, a power cut), it offers to recover the work the next time it starts. The copy is removed when you save or choose **Don't Save**.

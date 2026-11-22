@@ -4,6 +4,12 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Added
+
+- Linux release: an AppImage for x86_64 attached to each release, with in-app updates. It uses the static AppImage runtime, so it does not need libfuse2, and starts without Chromium's sandbox where the system blocks it
+- The Linux AppImage adds itself to the applications menu with its icon and the .kificut file type, and keeps the entry pointing at the AppImage after updates. Wayland desktops need this before they allow screen recording and global shortcuts. Set `KIFICUT_NO_DESKTOP_INTEGRATION=1` to skip it
+- Claude Code on Linux: the AppImage runs the connector itself with `--mcp-server`, and Kificut points Claude Code at the new file when an update or a move changes the AppImage's path
+
 ## [0.3.0]
 
 More local AI models for editing: noise reduction, footage search and background removal.

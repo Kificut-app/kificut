@@ -23,9 +23,11 @@ import {
 } from './media'
 import { cancelModelInstall, installModel, listModelStatus, modelsDir, removeModel } from './models'
 import { registerAssistantIpc } from './assistant'
+import { integrateAppImage } from './linux-desktop'
 import { checkForUpdates, installUpdate, startUpdater, updateStatus } from './updater'
 import { clearRecovery, readRecovery, saveRecovery } from './recovery'
-import { connectClaudeCode } from './claude-code'
+import { connectClaudeCode, refreshClaudeCodeRegistration } from './claude-code'
+import { isMcpServerMode, runMcpServer } from './mcp-mode'
 import {
   cancelMatte,
   finishMatte,
@@ -390,8 +392,9 @@ function registerIpc(): void {
   })
 }
 
-const gotLock = app.requestSingleInstanceLock()
-if (!gotLock) {
+if (isMcpServerMode()) {
+  runMcpServer()
+} else if (!app.requestSingleInstanceLock()) {
   app.quit()
 } else {
   pendingOpenPath = projectPathFromArgs(process.argv)
@@ -415,6 +418,8 @@ if (!gotLock) {
   app.whenReady().then(() => {
     app.setName('Kificut')
     if (process.platform === 'win32') app.setAppUserModelId('org.kificut.app')
+    // Linux AppImage: menu entry, icon, file type and a portal identity for Wayland.
+    integrateAppImage().catch((error: unknown) => console.error('Desktop integration failed:', error))
     handleMediaProtocol()
     handleModelsProtocol(modelsDir())
     registerIpc()
@@ -422,6 +427,8 @@ if (!gotLock) {
     buildMenu(isDev)
     createWindow()
     startUpdater(() => getSettings().autoUpdate)
+    // An AppImage moved or renamed by an update gets its Claude Code entry pointed at the new path.
+    setTimeout(() => void refreshClaudeCodeRegistration(), 10_000)
     if (getSettings().connectorEnabled) {
       startConnector().catch((error: unknown) => console.error('Could not start the AI connector:', error))
     } else {
