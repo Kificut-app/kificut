@@ -7,6 +7,7 @@ import type { CustomVoice } from '@shared/voices'
 import type { RecorderCommand, RecorderStatus, RecordingResult } from '@shared/recording'
 import type { AssistantEvent } from '@shared/assistant'
 import type { UpdateStatus } from '@shared/updates'
+import type { GenerationJob } from '@shared/generation'
 
 function subscribe<T extends unknown[]>(channel: string, callback: (...args: T) => void): () => void {
   const listener = (_event: Electron.IpcRendererEvent, ...args: unknown[]) => callback(...(args as T))
@@ -99,6 +100,19 @@ const api: KificutApi = {
     areaDisplay: () => ipcRenderer.invoke(IPC.recorderAreaDisplay),
     areaDone: (area) => ipcRenderer.invoke(IPC.recorderAreaDone, area),
     cameraView: () => ipcRenderer.invoke(IPC.recorderCameraView)
+  },
+
+  generation: {
+    settings: () => ipcRenderer.invoke(IPC.generationSettings),
+    update: (update) => ipcRenderer.invoke(IPC.generationUpdate, update),
+    capabilities: (service, model) => ipcRenderer.invoke(IPC.generationCapabilities, service, model),
+    estimate: (request) => ipcRenderer.invoke(IPC.generationEstimate, request),
+    start: (request) => ipcRenderer.invoke(IPC.generationStart, request),
+    cancel: (id) => ipcRenderer.invoke(IPC.generationCancel, id),
+    jobs: () => ipcRenderer.invoke(IPC.generationJobs),
+    test: (service) => ipcRenderer.invoke(IPC.generationTest, service),
+    pickWorkflow: () => ipcRenderer.invoke(IPC.generationPickWorkflow),
+    onJob: (callback) => subscribe<[GenerationJob]>(IPC.generationEvent, callback)
   },
 
   localAi: {

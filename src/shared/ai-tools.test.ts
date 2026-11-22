@@ -35,6 +35,7 @@ describe('AI tool definitions', () => {
         'get_project',
         'inspect_media',
         'list_ai_models',
+        'list_generations',
         'list_media_files',
         'list_voices',
         'transcribe_media',

@@ -21,9 +21,10 @@ import { cssFontFamily } from '../../engine/text'
 import { modKey } from '../../lib/platform'
 import { Button, ColorField, IconButton, cx } from '../ui/controls'
 import { VoicePanel } from './VoicePanel'
+import { GeneratePanel } from './GeneratePanel'
 import { FootageSearch } from './FootageSearch'
 
-type Tab = 'media' | 'text' | 'elements' | 'voice'
+type Tab = 'media' | 'text' | 'elements' | 'voice' | 'generate'
 
 const NO_MEDIA: MediaItem[] = []
 
@@ -37,7 +38,8 @@ export function MediaPanel() {
             ['media', 'Media'],
             ['text', 'Text'],
             ['elements', 'Elements'],
-            ['voice', 'Voice']
+            ['voice', 'Voice'],
+            ['generate', 'Generate']
           ] as const
         ).map(([id, label]) => (
           <button
@@ -57,6 +59,7 @@ export function MediaPanel() {
         {tab === 'text' && <TextPresets />}
         {tab === 'elements' && <Elements />}
         {tab === 'voice' && <VoicePanel />}
+        {tab === 'generate' && <GeneratePanel />}
       </div>
     </section>
   )

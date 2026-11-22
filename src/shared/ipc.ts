@@ -17,6 +17,14 @@ import type {
   RecordingResult
 } from './recording'
 import type { RecoverySnapshot, UpdateStatus } from './updates'
+import type {
+  GenerationJob,
+  GenerationRequest,
+  GenerationService,
+  GenerationSettings,
+  GenerationSettingsUpdate,
+  ModelCapabilities
+} from './generation'
 import type { AssistantEvent, AssistantSettings, ProviderId, ProviderUpdate } from './assistant'
 import type {
   AiStatus,
@@ -183,6 +191,22 @@ export interface KificutApi {
     areaDisplay(): Promise<DisplayInfo>
     areaDone(area: AreaRect | null): Promise<void>
     cameraView(): Promise<{ deviceId: string; shape: 'circle' | 'wide' }>
+  }
+
+  /** Scenes and pictures (Google, fal.ai, ComfyUI). Keys stay in the main process. */
+  generation: {
+    settings(): Promise<GenerationSettings>
+    update(update: GenerationSettingsUpdate): Promise<GenerationSettings>
+    capabilities(service: GenerationService, model: string): Promise<ModelCapabilities>
+    /** A short note on the expected cost. */
+    estimate(request: GenerationRequest): Promise<string>
+    start(request: GenerationRequest): Promise<GenerationJob>
+    cancel(id: number): Promise<void>
+    jobs(): Promise<GenerationJob[]>
+    /** Checks the saved key or address. Resolves with a short message, or rejects. */
+    test(service: GenerationService): Promise<string>
+    pickWorkflow(): Promise<string | null>
+    onJob(callback: (job: GenerationJob) => void): () => void
   }
 
   /** FFmpeg work for the local AI features. */
@@ -370,6 +394,16 @@ export const IPC = {
   recorderAreaDone: 'recorder:area-done',
   recorderCameraView: 'recorder:camera-view',
   updatesStatus: 'updates:status',
+  generationSettings: 'generation:settings',
+  generationUpdate: 'generation:update',
+  generationCapabilities: 'generation:capabilities',
+  generationEstimate: 'generation:estimate',
+  generationStart: 'generation:start',
+  generationCancel: 'generation:cancel',
+  generationJobs: 'generation:jobs',
+  generationTest: 'generation:test',
+  generationPickWorkflow: 'generation:pick-workflow',
+  generationEvent: 'generation:event',
   localAiSearchFrames: 'local-ai:search-frames',
   localAiReadIndex: 'local-ai:read-index',
   localAiWriteIndex: 'local-ai:write-index',

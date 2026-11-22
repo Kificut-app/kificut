@@ -114,6 +114,15 @@ Kokoro (text to speech) and Whisper (speech to text) run in a module worker in t
 - **Graph patch** (`src/main/onnx-patch.ts`): Turbo's 4 bit graphs leave `accuracy_level` unset on their `MatMulNBits` nodes, so ONNX Runtime unpacks the weights to floats for every multiplication. After download the installer sets it to 4 (integer dot products), which makes the language model about 25% faster with no audible difference. The patch edits only the small graph files, walking the protobuf just far enough to reach the nodes; the weight files stay as published. A reinstall finds the patched graphs no longer match their hash, downloads those few megabytes again and patches them again.
 - **Features** (`local-ai/features.ts`): voiceovers are encoded to WAV and saved through the main process; transcripts are cached per file, model and language; `captionsForClip` maps source time segments onto a clip with its trims and speed. The same functions back the Voice tab, the Generate Captions menu item and the `generate_voiceover`, `transcribe_media` and `add_captions` tools. Nothing is bundled with the app: `list_ai_models` and `install_ai_model` let an assistant install a model on request.
 
+## Generation
+
+Scenes and pictures come from services behind one `Adapter` interface in `src/main/generation`: `google.ts` (the Gemini API's Interactions endpoint; scenes come back as a Files API download, pictures inline), `fal.ts` (fal.ai's queue; each model's OpenAPI schema decides which fields are sent, so new fal.ai models work without code changes, and a text-to-video model with a starting picture switches to its image-to-video sibling) and `comfyui.ts` (the user's API-format workflow with `{{prompt}}` style placeholders, the starting picture uploaded for a LoadImage node). Each adapter reports what a model accepts (`capabilities`), what it should cost (`estimate`) and runs a request.
+
+- **Jobs** (`index.ts`) run in the main process, where the keys are: the Google key is the Assistant's Gemini key, the fal.ai key is stored with the same `safeStorage` helpers, and ComfyUI's address and workflow paths are in `generation.json`. Jobs report each step to every window and save the result in `Documents/Kificut/Generated`.
+- **Editor** (`store/generation.ts`, `GeneratePanel.tsx`, `GenerationSetup.tsx`): the store imports each finished file once and, when asked, places it at the playhead from when the job started on a free track above what is there (`placeOnFreeTracks`). The starting frame is `player.capture`.
+- **Tools**: `generate_media` reports the estimate and returns without doing anything unless `confirmed` is true (ComfyUI excepted), then waits up to 90 seconds for the job; `list_generations` follows longer ones.
+- **Testing**: `KIFICUT_GOOGLE_API`, `KIFICUT_FAL_QUEUE`, `KIFICUT_FAL_SCHEMA` and `KIFICUT_FAL_API` point the adapters at other addresses. `generation.test.ts` runs every adapter against local mock servers, so tests never spend money.
+
 ## Recording
 
 Screen and camera recording (`src/main/recorder.ts`, `src/renderer/src/recorder`, `src/shared/recording.ts`) is split across three kinds of windows.

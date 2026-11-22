@@ -19,10 +19,11 @@ import { cancelModelInstall, formatBytes, installModel, removeModel, useModels }
 import { toast, useUi } from '../../store/ui'
 import { useAssistant } from '../../store/assistant'
 import { useVoices } from '../../store/voices'
+import { GenerationSetup } from './GenerationSetup'
 import { Button, Segmented, Select } from '../ui/controls'
 import { Modal } from '../ui/overlays'
 
-type AiTab = 'models' | 'assistant'
+type AiTab = 'models' | 'assistant' | 'generation'
 
 export function openAiDialog(tab: AiTab = 'models'): void {
   useUi.setState({ aiTab: tab })
@@ -39,10 +40,11 @@ export function AiDialog() {
           onChange={(aiTab) => useUi.setState({ aiTab })}
           options={[
             { value: 'models', label: 'Models on this computer' },
-            { value: 'assistant', label: 'Assistant' }
+            { value: 'assistant', label: 'Assistant' },
+            { value: 'generation', label: 'Generation' }
           ]}
         />
-        {tab === 'models' ? <LocalModels /> : <AssistantSetup />}
+        {tab === 'models' ? <LocalModels /> : tab === 'assistant' ? <AssistantSetup /> : <GenerationSetup />}
       </div>
     </Modal>
   )

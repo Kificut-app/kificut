@@ -34,6 +34,7 @@ import {
 } from './recorder'
 import { stopVoiceEngine } from './voice-engine'
 import { VOICE_CLONE_MODEL } from '@shared/voices'
+import { registerGenerationIpc } from './generation'
 import { checkForUpdates, installUpdate, startUpdater, updateStatus } from './updater'
 import { clearRecovery, readRecovery, saveRecovery } from './recovery'
 import { connectClaudeCode, refreshClaudeCodeRegistration } from './claude-code'
@@ -244,6 +245,7 @@ function registerIpc(): void {
   registerAssistantIpc()
   registerVoiceIpc()
   registerRecorderIpc()
+  registerGenerationIpc()
 
   ipcMain.handle(IPC.updatesGet, () => updateStatus())
   ipcMain.handle(IPC.updatesCheck, () => checkForUpdates(true))

@@ -51,6 +51,18 @@ import {
 } from '@shared/models'
 import { VOICE_CLONE_MODEL } from '@shared/voices'
 import {
+  nearest,
+  nearestAspect,
+  SUGGESTED_MODELS,
+  type AspectRatio,
+  type GenerationJob,
+  type GenerationKind,
+  type GenerationRequest,
+  type GenerationService,
+  type GenerationSettings
+} from '@shared/generation'
+import { startGeneration, useGeneration } from '../store/generation'
+import {
   captionsForClip,
   cleanAudio,
   createVoiceover,
@@ -1104,6 +1116,127 @@ const tools: Record<string, Tool> = {
     )
   },
 
+  async generate_media(args) {
+    const project = requireProject()
+    const kind = string(args, 'kind', true) as GenerationKind
+    if (kind !== 'video' && kind !== 'image') throw new ToolError('"kind" must be video or image.')
+    const prompt = string(args, 'prompt', true)!.trim()
+    if (!prompt) throw new ToolError('Describe what to generate in "prompt".')
+    const settings = await window.kificut.generation.settings()
+    const wanted = string(args, 'service') as GenerationService | undefined
+    if (wanted && !['google', 'fal', 'comfyui'].includes(wanted)) {
+      throw new ToolError('"service" must be google, fal or comfyui.')
+    }
+    const service =
+      wanted ?? (['google', 'fal', 'comfyui'] as const).find((s) => serviceReady(s, kind, settings))
+    if (!service || !serviceReady(service, kind, settings)) {
+      throw new ToolError(
+        `${service ? `${service} is not set up for ${kind === 'video' ? 'scenes' : 'pictures'}` : 'No generation service is set up'}. The user can add a Gemini or fal.ai API key, or ComfyUI workflows, in Kificut's AI > Generation.`
+      )
+    }
+    const model =
+      service === 'comfyui'
+        ? kind
+        : (string(args, 'model') ?? SUGGESTED_MODELS[service].find((m) => m.kind === kind)!.id)
+    const caps = await window.kificut.generation.capabilities(service, model)
+    if (caps.kind !== kind) {
+      throw new ToolError(
+        `${model} makes ${caps.kind === 'video' ? 'scenes' : 'pictures'}. Use kind ${caps.kind}.`
+      )
+    }
+    const aspectArg = string(args, 'aspect') as AspectRatio | undefined
+    const aspect =
+      aspectArg && caps.aspects.includes(aspectArg)
+        ? aspectArg
+        : nearestAspect(project.settings.width, project.settings.height, caps.aspects)
+    const request: GenerationRequest = {
+      kind,
+      service,
+      model,
+      prompt,
+      duration: caps.durations.length
+        ? nearest(caps.durations, number(args, 'duration', { min: 1, max: 60 }) ?? 5)
+        : 5,
+      aspect,
+      resolution: caps.resolutions.length
+        ? caps.resolutions.includes('720p')
+          ? '720p'
+          : caps.resolutions[0]
+        : undefined
+    }
+    const estimate = await window.kificut.generation.estimate(request)
+    if (service !== 'comfyui' && bool(args, 'confirmed') !== true) {
+      return text(
+        `Nothing was generated or charged yet. This would cost ${estimate} (${kind === 'video' ? `a ${request.duration} s scene` : 'one picture'} with ${model}, ${aspect}). Tell the user the cost and call generate_media again with the same arguments and confirmed: true once they agree.`
+      )
+    }
+    if (bool(args, 'start_from_frame')) {
+      if (!caps.startImage) throw new ToolError(`${model} cannot start from a picture.`)
+      request.startImage = { data: await player.capture(1280), mimeType: 'image/jpeg' }
+    }
+    const place = bool(args, 'place') ?? true
+    const at = snapToFrame(
+      number(args, 'start', { min: 0 }) ?? useEditor.getState().playhead,
+      project.settings.fps
+    )
+    const job = await startGeneration(request, place, at)
+    const finished = await waitForJob(job.id, 90_000)
+    if (!finished || finished.state === 'running') {
+      return text(
+        `Still generating (job ${job.id}, ${estimate}). It goes into the media library${place ? ` and onto the timeline at ${r3(at)}s` : ''} when done; call list_generations to follow it.`
+      )
+    }
+    if (finished.state !== 'done') {
+      throw new ToolError(
+        finished.error ?? `The ${kind === 'video' ? 'scene' : 'picture'} was ${finished.state}.`
+      )
+    }
+    const mediaId = await waitFor(() => useGeneration.getState().media[job.id], 15_000)
+    const latest = useEditor.getState().project!
+    const media = latest.media.find((m) => m.id === mediaId)
+    if (!media) return text(`Generated ${finished.path}, but it could not be imported.`)
+    return json(
+      `Generated a ${kind === 'video' ? `${r1(media.duration)}s scene` : 'picture'} with ${model} (${estimate})${place ? ` and placed it at ${r3(at)}s` : ''}.`,
+      describeMedia(media, latest)
+    )
+  },
+
+  async list_generations() {
+    const [settings, jobs] = await Promise.all([
+      window.kificut.generation.settings(),
+      window.kificut.generation.jobs()
+    ])
+    const media = useGeneration.getState().media
+    const status = (service: GenerationService) => {
+      const scenes = serviceReady(service, 'video', settings)
+      const pictures = serviceReady(service, 'image', settings)
+      return scenes && pictures ? 'ready' : scenes ? 'scenes only' : pictures ? 'pictures only' : 'not set up'
+    }
+    return json('Generation services and the scenes and pictures made since Kificut started.', {
+      services: { google: status('google'), fal: status('fal'), comfyui: status('comfyui') },
+      generations: [...jobs]
+        .sort((a, b) => b.id - a.id)
+        .map((job) => ({
+          job: job.id,
+          kind: job.kind,
+          prompt: job.prompt,
+          service: job.service,
+          model: job.model,
+          state: job.state,
+          ...(job.state === 'running'
+            ? {
+                status: job.message,
+                progress_percent: job.progress === null ? null : Math.round(job.progress * 100)
+              }
+            : {}),
+          estimate: job.estimate,
+          media_id: media[job.id] ?? null,
+          file: job.path,
+          ...(job.error ? { error: job.error } : {})
+        }))
+    })
+  },
+
   async list_voices() {
     const [statuses, support, voices] = await Promise.all([
       window.kificut.models.list(),
@@ -1312,6 +1445,46 @@ const tools: Record<string, Tool> = {
         return text(`The export failed: ${job.error}`)
     }
   }
+}
+
+/** Whether a generation service has what it needs for a kind of result. */
+function serviceReady(
+  service: GenerationService,
+  kind: GenerationKind,
+  settings: GenerationSettings
+): boolean {
+  if (service === 'google') return settings.googleKey
+  if (service === 'fal') return settings.falKey
+  return Boolean(kind === 'video' ? settings.comfyuiVideoWorkflow : settings.comfyuiImageWorkflow)
+}
+
+/** Resolves with the job once it stops running, or null after `ms`. */
+function waitForJob(id: number, ms: number): Promise<GenerationJob | null> {
+  return new Promise((resolve) => {
+    const done = (job: GenerationJob | null) => {
+      window.clearTimeout(timer)
+      off()
+      resolve(job)
+    }
+    const timer = window.setTimeout(() => done(null), ms)
+    const off = window.kificut.generation.onJob((job) => {
+      if (job.id === id && job.state !== 'running') done(job)
+    })
+    // It may have finished before this listener was added.
+    const known = useGeneration.getState().jobs.find((j) => j.id === id)
+    if (known && known.state !== 'running') done(known)
+  })
+}
+
+/** Polls until `read` returns a value, or undefined after `ms`. */
+async function waitFor<T>(read: () => T | undefined, ms: number): Promise<T | undefined> {
+  const deadline = Date.now() + ms
+  while (Date.now() < deadline) {
+    const value = read()
+    if (value !== undefined) return value
+    await new Promise((resolve) => window.setTimeout(resolve, 100))
+  }
+  return read()
 }
 
 /** Which tools each kind of model is for, as list_ai_models reports it. */

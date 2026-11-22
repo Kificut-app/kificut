@@ -36,7 +36,7 @@ function settingsPath(): string {
   return join(app.getPath('userData'), 'assistant.json')
 }
 
-function canEncrypt(): boolean {
+export function canEncrypt(): boolean {
   if (!safeStorage.isEncryptionAvailable()) return false
   // On Linux without a keyring Electron falls back to a fixed password, which protects nothing.
   if (process.platform === 'linux') {
@@ -44,6 +44,19 @@ function canEncrypt(): boolean {
     if (backend === 'basic_text' || backend === 'unknown') return false
   }
   return true
+}
+
+/** Encrypts a secret with the system key store, or returns null when there is none to use. */
+export function encryptSecret(secret: string): string | null {
+  return canEncrypt() ? safeStorage.encryptString(secret).toString('base64') : null
+}
+
+export function decryptSecret(stored: string): string | null {
+  try {
+    return safeStorage.decryptString(Buffer.from(stored, 'base64'))
+  } catch {
+    return null
+  }
 }
 
 function load(): StoredSettings {

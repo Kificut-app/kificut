@@ -63,7 +63,7 @@ interface UiState {
   confirm: ConfirmState | null
   busy: string | null
   ai: AiState
-  aiTab: 'models' | 'assistant'
+  aiTab: 'models' | 'assistant' | 'generation'
   rightTab: 'inspector' | 'assistant'
   tasks: BackgroundTask[]
 }

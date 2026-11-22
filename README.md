@@ -37,6 +37,7 @@ Kificut is a multi-track editor built on Electron and FFmpeg. The preview is dra
 **AI, on your terms**
 
 - Voiceovers from a script with Kokoro, 28 natural English voices, or in your own voice from a recording of 10 to 20 seconds, generated on your computer
+- Generate short video scenes and pictures from a description with Google, fal.ai or your own ComfyUI, with the cost shown before you start
 - Captions from speech with Whisper in about 100 languages, also on your computer. Right click a clip and choose Generate Captions
 - An assistant panel that edits with you. Bring your own key for Anthropic, OpenAI, Google Gemini or OpenRouter, or use a local model through Ollama, LM Studio or any OpenAI compatible server
 - Connect Claude Desktop and ask for edits in plain language: "make a 30 second reel from the clips in my Trip folder with a title and some music". See [Use Kificut from Claude](#use-kificut-from-claude)
@@ -88,6 +89,20 @@ Notes:
 - macOS asks once for permission to record the screen, the camera and the microphone. If you said no, turn Kificut on under System Settings > Privacy & Security, then open it again.
 - On Linux, recording works on X11 and on Wayland (the default on Ubuntu and Fedora). On Wayland your desktop's own dialog asks which screen or window to record when you start, so Kificut shows no list of screens, recording an area is not available, and Wayland decides where the control bar goes. The tray icon needs a desktop that shows tray icons (GNOME needs the AppIndicator extension, which Ubuntu includes); the top bar of the Kificut window always has Stop and Pause too.
 - Recording the computer's sound needs Windows; Electron cannot capture it on macOS or Linux yet.
+
+## Generate scenes and pictures
+
+The **Generate** tab in the media panel makes a short video scene or a picture from a description. Choose the service and model, describe what to show, and pick the length, shape and resolution the model offers. Models that take a starting picture can start from the frame at the playhead (to extend a shot or make matching B-roll) or from a picture file. Kificut shows the expected cost before you click Generate.
+
+Jobs run in the background, so you can keep editing; the Recent list shows their progress and lets you cancel, add a finished one at the playhead, or try a failed one again. A result goes into the media library and, unless you turn it off, onto the timeline at the playhead from when you started, on a free track above what is there, so nothing is covered. Files are saved in `Documents/Kificut/Generated`.
+
+| Service | What it makes                                                                                                       | Cost                                                        | Setup in AI > Generation                                                                                       |
+| ------- | ------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Google  | Scenes with sound with Gemini Omni Flash (3 to 15 seconds, 360p to 4K, wide or tall), pictures with Nano Banana 2.1 | Billed per second or per picture to your Gemini API account | A Gemini API key (the same one the Assistant uses)                                                             |
+| fal.ai  | Wan 3.0, Kling 3, FLUX.1 and any other fal.ai model by its id; Kificut reads what each model accepts                | Billed by fal.ai at each model's price                      | A fal.ai API key                                                                                               |
+| ComfyUI | Your own workflows (for example Wan or LTX-Video) on your own graphics card                                         | Free, nothing leaves your network                           | The server address and workflows exported with Workflow > Export (API), with placeholders such as `{{prompt}}` |
+
+Each service has a **Check** button that tests the key or address without generating anything. Keys are encrypted with the system key store and only sent to their service. Claude and the Assistant can generate too, with the `generate_media` tool: it first reports the cost, and an assistant has to tell you and get your agreement before it calls again to generate (ComfyUI is free and needs no confirmation).
 
 ## AI features
 
