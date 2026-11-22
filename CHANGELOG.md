@@ -4,6 +4,10 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.4.0]
+
+Kificut for Linux, voiceovers in your own voice, screen and camera recording, and generated scenes and pictures.
+
 ### Added
 
 - Linux release: an AppImage for x86_64 attached to each release, with in-app updates. It uses the static AppImage runtime, so it does not need libfuse2, and starts without Chromium's sandbox where the system blocks it
