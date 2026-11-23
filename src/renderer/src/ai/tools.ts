@@ -74,6 +74,19 @@ import {
   transcribeMedia
 } from '../local-ai/features'
 import { player } from '../engine/player'
+import { clipLayer } from '../engine/layers'
+import {
+  defaultMask,
+  defaultShadow,
+  EFFECTS,
+  isMaskShape,
+  MASK_SHAPES,
+  normalizeBorder,
+  normalizeEffect,
+  normalizeMask,
+  normalizeShadow,
+  type MaskShape
+} from '@shared/effects'
 import { runExport } from '../engine/export'
 
 /** A problem the assistant can fix by calling the tool differently. */
@@ -255,6 +268,8 @@ function describeMedia(media: MediaItem, project: Project): Record<string, unkno
   return out
 }
 
+const visualKinds = new Set<Clip['kind']>(['video', 'image', 'text', 'solid'])
+
 function describeClip(clip: Clip, project: Project): Record<string, unknown> {
   const track = project.tracks.find((t) => t.id === clip.trackId)
   const out: Record<string, unknown> = {
@@ -298,6 +313,16 @@ function describeClip(clip: Clip, project: Project): Record<string, unknown> {
       Object.entries(clip.color).filter(([k, v]) => v !== defaults[k as keyof typeof defaults])
     )
     if (Object.keys(changed).length) out.color = changed
+  }
+  if (clip.mask) out.shape = clip.mask
+  if (clip.border) out.border = clip.border
+  if (clip.shadow) out.shadow = clip.shadow
+  if (clip.effects?.length) {
+    out.effects = clip.effects.map((e) => ({
+      type: e.type,
+      params: e.params,
+      ...(e.enabled ? {} : { enabled: false })
+    }))
   }
   return out
 }
@@ -714,6 +739,31 @@ const tools: Record<string, Tool> = {
     const newText = string(args, 'text')
     const style = object(args, 'style')
     const fill = hexColor(string(args, 'fill'), 'fill')
+    const shape = object(args, 'shape')
+    const border = object(args, 'border')
+    const shadow = object(args, 'shadow')
+    const effects = args.effects
+    if (effects !== undefined && !Array.isArray(effects)) throw new ToolError('"effects" must be a list.')
+    const parsedEffects = Array.isArray(effects)
+      ? effects.map((e, i) => {
+          const effect = normalizeEffect(e, () => uid('fx'))
+          if (!effect) {
+            throw new ToolError(
+              `effects[${i}] needs a "type": one of ${EFFECTS.map((d) => d.type).join(', ')}.`
+            )
+          }
+          return effect
+        })
+      : undefined
+    if ((shape || border || shadow || effects !== undefined) && !visualKinds.has(clip.kind)) {
+      throw new ToolError(
+        'Shapes, borders, shadows and effects work on video, images, text and color layers.'
+      )
+    }
+    const shapeName = shape ? string(shape, 'shape') : undefined
+    if (shapeName !== undefined && shapeName !== 'none' && !isMaskShape(shapeName)) {
+      throw new ToolError(`"shape" must be none or one of ${MASK_SHAPES.map((s) => s.shape).join(', ')}.`)
+    }
 
     const visual = clip.kind !== 'audio'
     if (transform && !visual) throw new ToolError('Audio clips have no picture to transform.')
@@ -810,6 +860,43 @@ const tools: Record<string, Tool> = {
           if (contrast !== undefined) c.contrast = contrast
           if (saturation !== undefined) c.saturation = saturation
           if (gamma !== undefined) c.gamma = gamma
+          const temperature = number(color, 'temperature', { min: -1, max: 1 })
+          const tint = number(color, 'tint', { min: -1, max: 1 })
+          if (temperature !== undefined) c.temperature = temperature
+          if (tint !== undefined) c.tint = tint
+        }
+        if (shape) {
+          if (shapeName === 'none') delete target.mask
+          else {
+            const layer = clipLayer(draft as Project, target as Clip)
+            const base =
+              target.mask && (shapeName === undefined || shapeName === target.mask.shape)
+                ? { ...target.mask }
+                : defaultMask((shapeName ?? 'rectangle') as MaskShape, layer.width, layer.height)
+            const next = normalizeMask({ ...base, ...shape, shape: base.shape })
+            if (next) target.mask = next
+          }
+        }
+        if (border) {
+          const width = number(border, 'width', { min: 0, max: 200 })
+          const borderColor = hexColor(string(border, 'color'), 'border.color')
+          const next = normalizeBorder({
+            width: width ?? target.border?.width ?? 4,
+            color: borderColor ?? target.border?.color ?? '#ffffff'
+          })
+          if (next) target.border = next
+          else delete target.border
+        }
+        if (shadow) {
+          if (bool(shadow, 'enabled') === false) delete target.shadow
+          else {
+            const next = normalizeShadow({ ...(target.shadow ?? defaultShadow()), ...shadow })
+            if (next) target.shadow = next
+          }
+        }
+        if (parsedEffects) {
+          if (parsedEffects.length) target.effects = parsedEffects
+          else delete target.effects
         }
         if (target.text) {
           if (newText !== undefined) target.text.content = newText.replace(/\\n/g, '\n')

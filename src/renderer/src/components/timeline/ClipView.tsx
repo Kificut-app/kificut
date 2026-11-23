@@ -105,6 +105,11 @@ export const ClipView = memo(function ClipView(props: ClipViewProps) {
         {Math.abs(clip.speed - 1) > 1e-3 && !compact && (
           <span className="clip__badge">{Math.round(clip.speed * 100)}%</span>
         )}
+        {!compact && Boolean(clip.mask || clip.border || clip.shadow || clip.effects?.length) && (
+          <span className="clip__badge" title="Shape, border, shadow or effects">
+            fx
+          </span>
+        )}
         {offline && <span className="clip__badge clip__badge--warn">Offline</span>}
       </div>
 

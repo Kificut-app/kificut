@@ -21,7 +21,9 @@ Kificut is a multi-track editor built on Electron and FFmpeg. The preview is dra
 **Picture and sound**
 
 - Position, scale, rotation, opacity, flip and crop, editable in the inspector or directly on the preview
-- Brightness, contrast, saturation and gamma
+- Brightness, contrast, saturation, gamma, temperature and tint
+- Shapes: cut any clip to a rectangle with rounded corners, an oval, a circle, a heart, a star, a triangle, a diamond or a hexagon, with a soft edge, a border and a drop shadow
+- Effects you can stack and reorder: blur, sharpen, pixelate, glow, vignette, film grain, RGB split, camera shake, black and white, sepia, invert, hue shift and chroma key for green and blue screens
 - Titles in any installed font with outlines, background boxes and drop shadows
 - Fade in and out on any clip, per clip volume in dB, speed from 10% to 1600% with pitch kept
 - Stereo output meter
@@ -89,6 +91,23 @@ Notes:
 - macOS asks once for permission to record the screen, the camera and the microphone. If you said no, turn Kificut on under System Settings > Privacy & Security, then open it again.
 - On Linux, recording works on X11 and on Wayland (the default on Ubuntu and Fedora). On Wayland your desktop's own dialog asks which screen or window to record when you start, so Kificut shows no list of screens, recording an area is not available, and Wayland decides where the control bar goes. The tray icon needs a desktop that shows tray icons (GNOME needs the AppIndicator extension, which Ubuntu includes); the top bar of the Kificut window always has Stop and Pause too.
 - Recording the computer's sound needs Windows; Electron cannot capture it on macOS or Linux yet.
+
+## Shapes and effects
+
+Select a clip and open **Shape**, **Border and Shadow** or **Effects** in the inspector. They work on video, pictures, titles and color layers, and look the same in the export as in the preview.
+
+- **Shape** cuts the clip to a rectangle, oval, circle, heart, star, triangle, diamond or hexagon. Set its size, position and rotation within the clip, round the corners, soften the edge with Feather, or Invert it to keep the outside. A circle with a border makes a webcam bubble; a rectangle with Roundness gives rounded corners.
+- **Border and Shadow** draws a line inside the edge of the shape (or of the clip) and a soft drop shadow that follows the shape and any transparency, such as a keyed person or a logo.
+- **Effects** are applied in the order listed, before the shape. Each one can be turned off, moved up or down, or removed:
+
+| Group            | Effects                                                                             |
+| ---------------- | ----------------------------------------------------------------------------------- |
+| Blur and sharpen | Blur, Sharpen, Pixelate (to hide faces or text)                                     |
+| Stylize          | Glow, Vignette, Film Grain, RGB Split, Camera Shake                                 |
+| Color            | Black and White, Sepia, Invert, Hue Shift (Temperature and Tint are in Color)       |
+| Keying           | Chroma Key, with spill removal, for green and blue screens. Pick the screen's color |
+
+Clips with a shape or effects show **fx** on the timeline. Assistants can set all of this too, through `update_clip`.
 
 ## Generate scenes and pictures
 
@@ -219,7 +238,7 @@ Signing is handled by electron-builder. Set `CSC_LINK` and `CSC_KEY_PASSWORD` fo
 
 ## How it works
 
-The renderer process holds the project in a Zustand store with immutable snapshots, which keeps undo and redo cheap. Playback uses one media element per clip near the playhead, synced to a master clock and composited with a small WebGL 2 shader. The shader uses the same math as FFmpeg's `eq` filter, so color adjustments look the same in the preview and in the export. Machines without WebGL 2 fall back to a 2D canvas.
+The renderer process holds the project in a Zustand store with immutable snapshots, which keeps undo and redo cheap. Playback uses one media element per clip near the playhead, synced to a master clock and composited with a small WebGL 2 shader. The shader uses the same math as FFmpeg's `eq` filter, so color adjustments look the same in the preview and in the export. Clips with effects go through extra shader passes that mirror the FFmpeg filters the export uses, and shapes, borders and vignettes are drawn once as images that both use. Machines without WebGL 2 fall back to a 2D canvas.
 
 When you export, text layers are rendered to PNG in the renderer and the main process turns the timeline into a single FFmpeg filter graph. The graph builder is a pure function in `src/shared/ffmpeg-graph.ts` with its own tests.
 

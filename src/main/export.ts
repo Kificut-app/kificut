@@ -40,10 +40,12 @@ export async function startExport(request: ExportRequest, win: BrowserWindow | n
 
   try {
     const overlays: Record<string, OverlayImage> = {}
-    for (const [clipId, overlay] of Object.entries(request.overlays)) {
-      const path = join(tempDir, `text-${clipId}.png`)
+    // Keys are clip ids, or a clip id with a suffix for mask, border and vignette images.
+    let index = 0
+    for (const [key, overlay] of Object.entries(request.overlays)) {
+      const path = join(tempDir, `image-${index++}.png`)
       await writeFile(path, Buffer.from(overlay.png))
-      overlays[clipId] = { path, width: overlay.width, height: overlay.height }
+      overlays[key] = { path, width: overlay.width, height: overlay.height }
     }
 
     const plan = buildRenderPlan({ project: request.project, settings: request.settings, overlays })

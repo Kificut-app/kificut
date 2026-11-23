@@ -4,6 +4,15 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Added
+
+- Shapes: cut any clip to a rectangle with rounded corners, an oval, a circle, a heart, a star, a triangle, a diamond or a hexagon, with size, position, rotation, roundness, feather and invert
+- Border and drop shadow for any clip, following its shape and transparency
+- Effects that stack in any order: Blur, Sharpen, Pixelate, Glow, Vignette, Film Grain, RGB Split, Camera Shake, Black and White, Sepia, Invert, Hue Shift and Chroma Key with spill removal. The preview and the export use the same math
+- Temperature and Tint in the Color section
+- Clips with a shape or effects show fx on the timeline
+- Tools for assistants: `update_clip` sets shapes, borders, shadows and effects, and `get_project` reports them
+
 ## [0.4.0]
 
 Kificut for Linux, voiceovers in your own voice, screen and camera recording, and generated scenes and pictures.

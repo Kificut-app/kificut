@@ -9,6 +9,8 @@ import { Compositor, hexToRgb, type LayerRenderer } from './compositor'
 import { CanvasCompositor } from './canvas-compositor'
 import { onFontLoaded, rasterizeText } from './text'
 import { clipLayer } from './layers'
+import { layerFx } from './fx'
+import { clipShake, temperatureGains } from '@shared/effects'
 
 interface MediaEntry {
   kind: 'video' | 'audio' | 'image'
@@ -21,6 +23,7 @@ interface MediaEntry {
 }
 
 const NEUTRAL = defaultColor()
+const NO_GAIN: [number, number, number] = [1, 1, 1]
 const LOOKAHEAD_PLAYING = 2.5
 const LOOKAHEAD_PAUSED = 0.75
 const DRIFT_LIMIT = 0.2
@@ -33,6 +36,8 @@ class Player {
   private compositor: LayerRenderer | null = null
   private canvas: HTMLCanvasElement | null = null
   private entries = new Map<string, MediaEntry>()
+  /** Canvas pixels per project pixel in the last render. */
+  private pixelScale = 1
   private audio: AudioContext | null = null
   private master: GainNode | null = null
   private analysers: AnalyserNode[] = []
@@ -446,6 +451,7 @@ class Player {
     const { width, height, background } = project.settings
     const scale = scaleOverride ?? clamp(state.previewScale, 0.25, 1)
     compositor.resize(Math.round(width * scale), Math.round(height * scale), width, height)
+    this.pixelScale = Math.round(width * scale) / width
     compositor.begin(background)
 
     const media = this.mediaMap(project)
@@ -493,7 +499,12 @@ class Player {
       return
     }
 
-    const layer = clipLayer(project, clip, item)
+    const [sx, sy] = clipShake(clip, t - clip.start)
+    const base = clipLayer(project, clip, item)
+    const layer = sx || sy ? { ...base, cx: base.cx + sx, cy: base.cy + sy } : base
+    const built = layerFx(clip, layer, this.pixelScale, Math.floor((t - clip.start) * project.settings.fps))
+    // A shadow pads the finished layer on every side.
+    const pad = built ? built.pad / this.pixelScale : 0
     const tr = clip.transform
     const [cl, cr] = clampCrop(tr.cropLeft, tr.cropRight)
     const [ct, cb] = clampCrop(tr.cropTop, tr.cropBottom)
@@ -503,16 +514,21 @@ class Player {
     let v1 = 1 - cb
     if (tr.flipH) [u0, u1] = [1 - u0, 1 - u1]
     if (tr.flipV) [v0, v1] = [1 - v0, 1 - v1]
+    const graded = clip.kind === 'video' || clip.kind === 'image'
 
     compositor.draw({
       key,
       source,
       upload,
       solid,
-      corners: layerCorners(layer),
+      corners: layerCorners(
+        pad ? { ...layer, width: layer.width + 2 * pad, height: layer.height + 2 * pad } : layer
+      ),
       uv: [u0, v0, u1, v1],
-      color: clip.kind === 'video' || clip.kind === 'image' ? clip.color : NEUTRAL,
-      opacity: tr.opacity * fadeFactor(clip, t)
+      color: graded ? clip.color : NEUTRAL,
+      gain: graded ? temperatureGains(clip.color.temperature ?? 0, clip.color.tint ?? 0) : NO_GAIN,
+      opacity: tr.opacity * fadeFactor(clip, t),
+      fx: built?.fx
     })
   }
 }

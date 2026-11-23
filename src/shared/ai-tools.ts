@@ -1,5 +1,6 @@
 import { EXPORT_FORMATS } from './export-formats'
 import { KOKORO_VOICES, LOCAL_MODELS } from './models'
+import { EFFECTS, MASK_SHAPES, type EffectParam } from './effects'
 
 /*
  * Tools that AI assistants (through the Claude connector, or any MCP client) can call to edit in
@@ -15,6 +16,12 @@ export interface ToolResult {
 }
 
 type Schema = Record<string, unknown>
+
+/** "amount 0 to 100 (default 12)", with percentages as fractions, for the effects description. */
+function describeParam(p: EffectParam): string {
+  if (p.kind === 'color') return `${p.key} hex color (default ${p.default})`
+  return `${p.key} ${p.min} to ${p.max}${p.suffix === ' px' ? ' px' : p.suffix === '°' ? ' degrees' : ''} (default ${p.default})`
+}
 
 export interface ToolDefinition {
   name: string
@@ -310,7 +317,77 @@ export const AI_TOOLS: ToolDefinition[] = [
             maximum: 3,
             description: '1 is unchanged, 0 is black and white.'
           },
-          gamma: { type: 'number', minimum: 0.1, maximum: 3, description: '1 is unchanged.' }
+          gamma: { type: 'number', minimum: 0.1, maximum: 3, description: '1 is unchanged.' },
+          temperature: {
+            type: 'number',
+            minimum: -1,
+            maximum: 1,
+            description: 'Warmer above 0, cooler below.'
+          },
+          tint: {
+            type: 'number',
+            minimum: -1,
+            maximum: 1,
+            description: 'Toward magenta above 0, green below.'
+          }
+        }
+      },
+      shape: {
+        type: 'object',
+        additionalProperties: false,
+        description:
+          'Cut the picture to a shape (any visual clip), such as a circle for a webcam or a rectangle with rounded corners. {"shape": "none"} removes it. Sizes and positions are multiples of the shorter side of the clip.',
+        properties: {
+          shape: { type: 'string', enum: ['none', ...MASK_SHAPES.map((s) => s.shape)] },
+          width: { type: 'number', minimum: 0.01, maximum: 10, description: 'Diameter for a circle.' },
+          height: { type: 'number', minimum: 0.01, maximum: 10 },
+          x: { type: 'number', description: 'Offset of the center from the middle of the clip.' },
+          y: { type: 'number' },
+          rotation: { type: 'number', description: 'Degrees, clockwise.' },
+          roundness: { type: 'number', minimum: 0, maximum: 1, description: 'Rounded corners.' },
+          feather: { type: 'number', minimum: 0, maximum: 500, description: 'Soft edge in pixels.' },
+          invert: { type: 'boolean', description: 'Keep the outside of the shape instead.' }
+        }
+      },
+      border: {
+        type: 'object',
+        additionalProperties: false,
+        description: 'A line inside the edge of the shape (or of the clip). Width 0 removes it.',
+        properties: {
+          width: { type: 'number', minimum: 0, maximum: 200, description: 'Pixels.' },
+          color: color('Border color.')
+        }
+      },
+      shadow: {
+        type: 'object',
+        additionalProperties: false,
+        description: 'Drop shadow behind the clip, following its shape and transparency.',
+        properties: {
+          enabled: { type: 'boolean', description: 'false removes the shadow.' },
+          color: color('Shadow color.'),
+          opacity: { type: 'number', minimum: 0, maximum: 1 },
+          blur: { type: 'number', minimum: 0, maximum: 200, description: 'Softness in pixels.' },
+          distance: { type: 'number', minimum: 0, maximum: 500, description: 'Offset in pixels.' },
+          angle: {
+            type: 'number',
+            description: 'Direction in degrees clockwise from the right; 90 falls down.'
+          }
+        }
+      },
+      effects: {
+        type: 'array',
+        description: `Replaces the clip's effects with this list, applied in order before the shape ([] removes them all). Each item is {"type", "params"?, "enabled"?}; parameters left out use their defaults. ${EFFECTS.map(
+          (e) => `${e.type} (${e.description.replace(/\.$/, '')}): ${e.params.map(describeParam).join(', ')}`
+        ).join('. ')}.`,
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['type'],
+          properties: {
+            type: { type: 'string', enum: EFFECTS.map((e) => e.type) },
+            params: { type: 'object', description: 'Parameter values by name.' },
+            enabled: { type: 'boolean' }
+          }
         }
       },
       text: string('New text for a text clip.'),

@@ -1,14 +1,12 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   AlignCenter,
   AlignLeft,
   AlignRight,
-  ChevronDown,
   FlipHorizontal2,
   FlipVertical2,
   Italic,
   Link2,
-  RotateCcw,
   Trash2,
   Unlink2
 } from 'lucide-react'
@@ -32,6 +30,8 @@ import { useFonts } from '../../lib/fonts'
 import { useUi } from '../../store/ui'
 import { useAssistant } from '../../store/assistant'
 import { AssistantPanel } from '../assistant/AssistantPanel'
+import { Row, Section, SliderRow } from './parts'
+import { BorderShadowSection, EffectsSection, ShapeSection } from './EffectsSections'
 import {
   Button,
   ColorField,
@@ -96,76 +96,6 @@ export function Inspector() {
         <AssistantPanel />
       )}
     </section>
-  )
-}
-
-function Section({
-  title,
-  children,
-  onReset,
-  defaultOpen = true
-}: {
-  title: string
-  children: ReactNode
-  onReset?: () => void
-  defaultOpen?: boolean
-}) {
-  const [open, setOpen] = useState(defaultOpen)
-  return (
-    <div className={cx('section', open && 'is-open')}>
-      <div className="section__header">
-        <button type="button" className="section__toggle" onClick={() => setOpen(!open)} aria-expanded={open}>
-          <ChevronDown size={13} className="section__chevron" />
-          {title}
-        </button>
-        {onReset && (
-          <IconButton size="sm" tip="Reset" onClick={onReset}>
-            <RotateCcw size={12} />
-          </IconButton>
-        )}
-      </div>
-      {open && <div className="section__body">{children}</div>}
-    </div>
-  )
-}
-
-function Row({ label, children, wide }: { label: string; children: ReactNode; wide?: boolean }) {
-  return (
-    <div className={cx('row', wide && 'row--wide')}>
-      <span className="row__label">{label}</span>
-      <div className="row__control">{children}</div>
-    </div>
-  )
-}
-
-function SliderRow(props: {
-  label: string
-  value: number
-  onChange: (v: number) => void
-  min: number
-  max: number
-  step?: number
-  display?: number
-  precision?: number
-  suffix?: string
-  reset: number
-}) {
-  const { label, value, onChange, min, max, step = 0.01, display = 1, precision = 0, suffix, reset } = props
-  return (
-    <Row label={label}>
-      <Slider value={value} min={min} max={max} step={step} reset={reset} onChange={onChange} />
-      <NumberField
-        className="num-field--compact"
-        value={value}
-        onChange={onChange}
-        min={min}
-        max={max}
-        step={step * display >= 1 ? 1 : step * display}
-        display={display}
-        precision={precision}
-        suffix={suffix}
-      />
-    </Row>
   )
 }
 
@@ -443,8 +373,32 @@ function ClipInspector({ project, clip, audio }: { project: Project; clip: Clip;
             reset={1}
             onChange={(gamma) => setColor({ gamma }, 'gamma')}
           />
+          <SliderRow
+            label="Temperature"
+            value={clip.color.temperature ?? 0}
+            min={-1}
+            max={1}
+            step={0.01}
+            display={100}
+            reset={0}
+            onChange={(temperature) => setColor({ temperature }, 'temperature')}
+          />
+          <SliderRow
+            label="Tint"
+            value={clip.color.tint ?? 0}
+            min={-1}
+            max={1}
+            step={0.01}
+            display={100}
+            reset={0}
+            onChange={(tint) => setColor({ tint }, 'tint')}
+          />
         </Section>
       )}
+
+      {visual && <ShapeSection project={project} clip={clip} update={update} />}
+      {visual && <BorderShadowSection clip={clip} update={update} />}
+      {visual && <EffectsSection clip={clip} update={update} />}
 
       {audioClip && <AudioSection clip={audioClip} />}
 

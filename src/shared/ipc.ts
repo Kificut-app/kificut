@@ -87,7 +87,7 @@ export interface OpenedProject {
 export interface ExportRequest {
   project: Project
   settings: ExportSettings
-  /** PNG bytes for text clips, keyed by clip id. */
+  /** PNG bytes for text clips (keyed by clip id) and for masks, borders and vignettes (`fxImageKey`). */
   overlays: Record<string, { png: Uint8Array; width: number; height: number }>
 }
 

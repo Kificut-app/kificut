@@ -1,3 +1,5 @@
+import type { ClipBorder, ClipMask, ClipShadow, Effect } from './effects'
+
 export type TrackKind = 'video' | 'audio'
 export type MediaKind = 'video' | 'audio' | 'image'
 export type ClipKind = 'video' | 'audio' | 'image' | 'text' | 'solid'
@@ -46,6 +48,10 @@ export interface ColorAdjust {
   contrast: number
   saturation: number
   gamma: number
+  /** Warmer (positive) or cooler (negative), -1..1. */
+  temperature: number
+  /** Toward magenta (positive) or green (negative), -1..1. */
+  tint: number
 }
 
 export type TextAlign = 'left' | 'center' | 'right'
@@ -91,6 +97,12 @@ export interface Clip {
   fadeOut: number
   text: TextStyle | null
   solidColor: string | null
+  /** Shape the picture is cut to. */
+  mask?: ClipMask | null
+  border?: ClipBorder | null
+  shadow?: ClipShadow | null
+  /** Applied in order, before the mask. */
+  effects?: Effect[]
 }
 
 export interface Track {

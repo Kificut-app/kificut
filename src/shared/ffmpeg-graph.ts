@@ -1,6 +1,22 @@
-import { computeLayer, fitsToFrame } from './geometry'
+import { computeLayer, fitsToFrame, type LayerRect } from './geometry'
 import type { ExportSettings } from './export-formats'
 import type { Clip, ColorAdjust, MediaItem, Project } from './types'
+import {
+  activeEffects,
+  colorMatrix,
+  effectColor,
+  effectNumber,
+  fxImageKey,
+  grainStrength,
+  pixelateCells,
+  rgbSplitOffset,
+  screenType,
+  shadowLayout,
+  shakeExpressions,
+  temperatureGains,
+  type ClipShadow,
+  type Effect
+} from './effects'
 
 /** A rasterized text layer, written to disk by the renderer before export. */
 export interface OverlayImage {
@@ -61,13 +77,18 @@ export function atempoChain(speed: number): string[] {
   return filters
 }
 
-export function isDefaultColor(color: ColorAdjust): boolean {
+/** Whether the brightness, contrast, saturation and gamma part needs FFmpeg's eq filter. */
+function needsEq(color: ColorAdjust): boolean {
   return (
-    Math.abs(color.brightness) < EPSILON &&
-    Math.abs(color.contrast - 1) < EPSILON &&
-    Math.abs(color.saturation - 1) < EPSILON &&
-    Math.abs(color.gamma - 1) < EPSILON
+    Math.abs(color.brightness) >= EPSILON ||
+    Math.abs(color.contrast - 1) >= EPSILON ||
+    Math.abs(color.saturation - 1) >= EPSILON ||
+    Math.abs(color.gamma - 1) >= EPSILON
   )
+}
+
+export function isDefaultColor(color: ColorAdjust): boolean {
+  return !needsEq(color) && Math.abs(color.temperature ?? 0) < EPSILON && Math.abs(color.tint ?? 0) < EPSILON
 }
 
 function eqFilter(color: ColorAdjust): string {
@@ -127,6 +148,193 @@ class Graph {
 
   toString(): string {
     return this.statements.join(';\n')
+  }
+}
+
+/** Export pixels per project pixel. */
+export function exportScale(project: Project, settings: ExportSettings): number {
+  return even(settings.width) / project.settings.width
+}
+
+/** Size in export pixels a layer is scaled to before its effects, mask and rotation. */
+export function exportLayerSize(layer: LayerRect, k: number): [number, number] {
+  return [Math.max(2, Math.round(layer.width * k)), Math.max(2, Math.round(layer.height * k))]
+}
+
+/**
+ * The filters of one visual clip. Filters that keep transparency are collected into one statement;
+ * the rest run on the color planes with the alpha split off and merged back, as eq needs.
+ */
+class ClipChain {
+  private pending: string[]
+
+  constructor(
+    private graph: Graph,
+    private stream: string,
+    head: string[],
+    private alpha: boolean
+  ) {
+    this.pending = [...head]
+  }
+
+  add(filters: string[]): void {
+    this.pending.push(...filters)
+  }
+
+  /** Marks the stream as having transparency from here on (after a key or a mask). */
+  hasAlpha(): void {
+    this.alpha = true
+  }
+
+  alphaUnsafe(filters: string[]): void {
+    if (!this.alpha) return this.add(filters)
+    const color = this.graph.label('c')
+    const alpha = this.graph.label('a')
+    this.graph.add(this.stream, [...this.pending, 'format=rgba', 'split=2'], [color, alpha])
+    this.pending = []
+    const extracted = this.graph.add(alpha, ['alphaextract'])
+    const graded = this.graph.add(color, filters)
+    this.stream = this.graph.add([graded, extracted], ['alphamerge'])
+  }
+
+  /** Ends the current statement and returns its output label. */
+  flush(extra: string[] = []): string {
+    if (this.pending.length || extra.length) {
+      this.stream = this.graph.add(this.stream, [...this.pending, ...extra])
+      this.pending = []
+    }
+    return this.stream
+  }
+
+  /** Blends an image of the same size on top, in planar RGB with alpha. */
+  blend(image: string, modes: string): void {
+    const base = this.flush(['format=gbrap'])
+    this.stream = this.graph.add([base, image], [`blend=${modes}`])
+    if (modes.includes('c3_mode')) this.alpha = true
+  }
+
+  overlay(image: string): void {
+    const base = this.flush(['format=rgba'])
+    this.stream = this.graph.add([base, image], ['overlay=0:0:format=auto'])
+  }
+
+  /** Runs `branch` on a copy of the stream and blends the result with the original using `modes`. */
+  splitBlend(branch: string[], modes: string): void {
+    const a = this.graph.label('s')
+    const b = this.graph.label('s')
+    this.graph.add(this.stream, [...this.pending, 'format=gbrap', 'split=2'], [a, b])
+    this.pending = []
+    const processed = this.graph.add(b, [...branch, 'format=gbrap'])
+    this.stream = this.graph.add([a, processed], [`blend=${modes}`])
+  }
+
+  /** Pads the layer and puts a soft, offset copy of its alpha in the shadow color underneath. */
+  shadow(
+    shadow: ClipShadow,
+    layout: { pad: number; sigma: number; offset: [number, number] },
+    size: { width: number; height: number; fps: number; duration: number }
+  ): void {
+    const { pad, sigma, offset } = layout
+    const w = size.width + 2 * pad
+    const h = size.height + 2 * pad
+    const layer = this.graph.label('l')
+    const copy = this.graph.label('l')
+    this.graph.add(this.stream, [...this.pending, 'format=rgba', 'split=2'], [layer, copy])
+    this.pending = []
+    const padded = this.graph.add(layer, [`pad=${w}:${h}:${pad}:${pad}:color=black@0`])
+    const alphaFilters = [`pad=${w}:${h}:${pad + offset[0]}:${pad + offset[1]}:color=black@0`, 'alphaextract']
+    if (sigma > 0.3) alphaFilters.push(`gblur=sigma=${num(sigma)}:steps=4`)
+    const alpha = this.graph.add(copy, alphaFilters)
+    const fill = this.graph.add('', [
+      `color=c=${ffColor(shadow.color)}:s=${w}x${h}:r=${num(size.fps)}:d=${num(size.duration)}`
+    ])
+    const tinted = this.graph.add(
+      [fill, alpha],
+      ['alphamerge', `colorchannelmixer=aa=${num(shadow.opacity)}`]
+    )
+    this.stream = this.graph.add([tinted, padded], ['overlay=0:0:format=auto'])
+    this.alpha = true
+  }
+
+  finish(): string {
+    return this.flush()
+  }
+}
+
+/** Adds one effect's filters. Sizes are in export pixels (`k` per project pixel). */
+function addEffect(
+  chain: ClipChain,
+  effect: Effect,
+  ctx: { k: number; width: number; height: number; vignette: () => string | null }
+): void {
+  const n = (key: string) => effectNumber(effect, key)
+  switch (effect.type) {
+    case 'blur': {
+      const sigma = (n('amount') * ctx.k) / 2
+      if (sigma > 0.3) chain.add([`gblur=sigma=${num(sigma)}:steps=4`])
+      return
+    }
+    case 'sharpen':
+      chain.alphaUnsafe([`unsharp=lx=5:ly=5:la=${num(n('amount'))}:cx=5:cy=5:ca=0`])
+      return
+    case 'pixelate': {
+      const [cols, rows] = pixelateCells(ctx.width, ctx.height, n('size') * ctx.k)
+      chain.add([`scale=${cols}:${rows}:flags=area`, `scale=${ctx.width}:${ctx.height}:flags=neighbor`])
+      return
+    }
+    case 'glow': {
+      const low = Math.min(254, Math.round(n('threshold') * 255))
+      const gain = num(255 / (255 - low))
+      const lut = `'clip((val-${low})*${gain},0,255)'`
+      const sigma = (n('radius') * ctx.k) / 2
+      const branch = ['format=rgba', `lutrgb=r=${lut}:g=${lut}:b=${lut}`]
+      if (sigma > 0.3) branch.push(`gblur=sigma=${num(sigma)}:steps=4`)
+      // Screen keeps the picture and adds the blurred highlights on top, by the intensity.
+      chain.splitBlend(branch, `all_mode=screen:all_opacity=${num(n('intensity'))}`)
+      return
+    }
+    case 'vignette': {
+      const image = ctx.vignette()
+      if (image) chain.blend(image, 'c0_mode=multiply:c1_mode=multiply:c2_mode=multiply')
+      return
+    }
+    case 'grain':
+      chain.add([`noise=c0s=${grainStrength(effect)}:c0f=t`])
+      return
+    case 'rgbSplit': {
+      const [dx, dy] = rgbSplitOffset(effect, ctx.k)
+      if (dx || dy) chain.add([`rgbashift=rh=${dx}:rv=${dy}:bh=${-dx}:bv=${-dy}:edge=smear`])
+      return
+    }
+    case 'blackWhite':
+    case 'sepia':
+    case 'hue': {
+      const m = colorMatrix(effect)!
+      const names = ['rr', 'rg', 'rb', 'gr', 'gg', 'gb', 'br', 'bg', 'bb']
+      chain.add([`colorchannelmixer=${names.map((name, i) => `${name}=${num(m[i])}`).join(':')}`])
+      return
+    }
+    case 'invert': {
+      const lut = `'val+(255-2*val)*${num(n('amount'))}'`
+      chain.add([`lutrgb=r=${lut}:g=${lut}:b=${lut}`])
+      return
+    }
+    case 'chromaKey': {
+      const color = effectColor(effect, 'color')
+      chain.add([
+        `chromakey=color=${ffColor(color)}:similarity=${num(n('similarity'))}:blend=${num(n('smoothness'))}`
+      ])
+      chain.hasAlpha()
+      const spill = n('spill')
+      if (spill > EPSILON) {
+        const type = screenType(color)
+        const scales = type === 'green' ? `green=${num(-spill)}` : `green=0:blue=${num(-spill)}`
+        chain.add([`despill=type=${type}:mix=0.5:expand=0:${scales}`])
+      }
+      return
+    }
+    case 'shake':
+      return
   }
 }
 
@@ -337,8 +545,7 @@ export function buildRenderPlan(job: RenderJob): RenderPlan {
           fitsToFrame(clip.kind)
         )
         const t = clip.transform
-        const scaledWidth = Math.max(2, Math.round(layer.width * k))
-        const scaledHeight = Math.max(2, Math.round(layer.height * k))
+        const [scaledWidth, scaledHeight] = exportLayerSize(layer, k)
 
         const head: string[] = []
         if (clip.kind === 'video' && Math.abs(clip.speed - 1) > EPSILON) {
@@ -356,20 +563,50 @@ export function buildRenderPlan(job: RenderJob): RenderPlan {
         }
         head.push(`scale=${scaledWidth}:${scaledHeight}:flags=bicubic`)
 
-        const colorize = clip.kind !== 'text' && clip.kind !== 'solid' && !isDefaultColor(clip.color)
-        let stream: string
-        if (colorize && source.alpha) {
-          // eq only works on YUV without alpha, so grade the color planes and merge the alpha back.
-          const colorLabel = graph.label('c')
-          const alphaLabel = graph.label('a')
-          graph.add(source.input, [...head, 'format=rgba', 'split=2'], [colorLabel, alphaLabel])
-          const alpha = graph.add(alphaLabel, ['alphaextract'])
-          const graded = graph.add(colorLabel, [eqFilter(clip.color)])
-          stream = graph.add([graded, alpha], ['alphamerge'])
-        } else {
-          const filters = [...head]
-          if (colorize) filters.push(eqFilter(clip.color))
-          stream = graph.add(source.input, filters)
+        const chain = new ClipChain(graph, source.input, head, source.alpha)
+        const image = (key: string): string | null => {
+          const file = overlays[key]
+          if (!file) return null
+          const index = addInput([
+            '-loop',
+            '1',
+            '-framerate',
+            num(fps),
+            '-t',
+            num(ranged.duration),
+            '-i',
+            file.path
+          ])
+          return graph.add(`[${index}:v]`, [`scale=${scaledWidth}:${scaledHeight}`, 'format=gbrap'])
+        }
+
+        if (clip.kind === 'video' || clip.kind === 'image') {
+          if (needsEq(clip.color)) chain.alphaUnsafe([eqFilter(clip.color)])
+          const gains = temperatureGains(clip.color.temperature ?? 0, clip.color.tint ?? 0)
+          if (gains.some((g) => Math.abs(g - 1) > EPSILON)) {
+            chain.add([`colorchannelmixer=rr=${num(gains[0])}:gg=${num(gains[1])}:bb=${num(gains[2])}`])
+          }
+        }
+        for (const effect of activeEffects(clip)) {
+          addEffect(chain, effect, {
+            k,
+            width: scaledWidth,
+            height: scaledHeight,
+            vignette: () => image(fxImageKey.vignette(clip.id, effect.id))
+          })
+        }
+
+        const mask = clip.mask ? image(fxImageKey.mask(clip.id)) : null
+        if (mask) chain.blend(mask, 'c3_mode=multiply')
+        const border = clip.border ? image(fxImageKey.border(clip.id)) : null
+        if (border) chain.overlay(border)
+        if (clip.shadow && clip.shadow.opacity > EPSILON) {
+          chain.shadow(clip.shadow, shadowLayout(clip.shadow, k, t.rotation), {
+            width: scaledWidth,
+            height: scaledHeight,
+            fps,
+            duration: ranged.duration
+          })
         }
 
         const tail: string[] = ['format=rgba']
@@ -383,18 +620,26 @@ export function buildRenderPlan(job: RenderJob): RenderPlan {
           tail.push(`fade=t=out:st=${num(ranged.fadeOutStart)}:d=${num(ranged.fadeOut)}:alpha=1`)
         }
         tail.push(`setpts=PTS+${num(ranged.start)}/TB`)
-        const prepared = graph.add(stream, tail)
+        chain.add(tail)
+        const prepared = chain.finish()
 
-        const cx = layer.cx * k
-        const cy = layer.cy * k
+        const cx = num(layer.cx * k, 3)
+        const cy = num(layer.cy * k, 3)
+        let x = `x=${cx}-overlay_w/2`
+        let y = `y=${cy}-overlay_h/2`
+        const shakes = activeEffects(clip).filter((e) => e.type === 'shake')
+        if (shakes.length) {
+          // Clip time: export time plus where the export starts, minus where the clip starts.
+          const offset = settings.start - clip.start
+          const local = `t${offset < 0 ? '-' : '+'}${num(Math.abs(offset))}`
+          const parts = shakes.map((e) => shakeExpressions(e, local, k, (n) => num(n, 4)))
+          x = `x='${cx}-overlay_w/2+${parts.map((p) => p[0]).join('+')}'`
+          y = `y='${cy}-overlay_h/2+${parts.map((p) => p[1]).join('+')}'`
+        }
         const end = ranged.start + ranged.duration
         current = graph.add(
           [current, prepared],
-          [
-            `overlay=x=${num(cx, 3)}-overlay_w/2:y=${num(cy, 3)}-overlay_h/2:eof_action=pass:enable='between(t,${num(
-              ranged.start
-            )},${num(end)})'`
-          ],
+          [`overlay=${x}:${y}:eof_action=pass:enable='between(t,${num(ranged.start)},${num(end)})'`],
           graph.label('v')
         )
       }

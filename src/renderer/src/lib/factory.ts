@@ -35,7 +35,7 @@ export function defaultTransform(): Transform {
 }
 
 export function defaultColor(): ColorAdjust {
-  return { brightness: 0, contrast: 1, saturation: 1, gamma: 1 }
+  return { brightness: 0, contrast: 1, saturation: 1, gamma: 1, temperature: 0, tint: 0 }
 }
 
 export function defaultTextStyle(overrides: Partial<TextStyle> = {}): TextStyle {

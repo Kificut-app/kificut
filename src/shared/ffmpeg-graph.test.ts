@@ -174,7 +174,7 @@ describe('buildRenderPlan', () => {
         flipH: true,
         cropLeft: 0.1
       }
-      clip.color = { brightness: 0.1, contrast: 1.2, saturation: 0.5, gamma: 1 }
+      clip.color = { brightness: 0.1, contrast: 1.2, saturation: 0.5, gamma: 1, temperature: 0, tint: 0 }
       return [clip]
     })
     const graph = buildRenderPlan({ project: p, settings: settings(), overlays: {} }).filterGraph

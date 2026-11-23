@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { ExportFormatId, ExportSettings } from './export-formats'
 import { buildRenderPlan, planToArgs, type OverlayImage } from './ffmpeg-graph'
+import { defaultEffectParams, defaultMask, EFFECTS, fxImageKey } from './effects'
 import type { MediaItem, Project } from './types'
 import { createClip, createProject } from '../renderer/src/lib/factory'
 
@@ -145,7 +146,14 @@ describe.skipIf(!available)('FFmpeg export', () => {
       cropLeft: 0.1,
       cropBottom: 0.05
     }
-    clip.color = { brightness: 0.05, contrast: 1.1, saturation: 1.3, gamma: 1.1 }
+    clip.color = {
+      brightness: 0.05,
+      contrast: 1.1,
+      saturation: 1.3,
+      gamma: 1.1,
+      temperature: 0.3,
+      tint: -0.1
+    }
     const sound = createClip({
       trackId: a1.id,
       kind: 'audio',
@@ -168,7 +176,7 @@ describe.skipIf(!available)('FFmpeg export', () => {
     })
     const logo = createClip({ trackId: v2.id, kind: 'image', mediaId: 'i', start: 0.5, duration: 2 })
     logo.transform = { ...logo.transform, scale: 0.3, x: 300, y: -200 }
-    logo.color = { brightness: 0, contrast: 1, saturation: 0, gamma: 1 }
+    logo.color = { brightness: 0, contrast: 1, saturation: 0, gamma: 1, temperature: 0, tint: 0 }
     const solid = createClip({
       trackId: v2.id,
       kind: 'solid',
@@ -246,6 +254,113 @@ describe.skipIf(!available)('FFmpeg export', () => {
     },
     120_000
   )
+
+  it('renders every effect with a shape, a border and a shadow', () => {
+    const { project, textId } = richProject()
+    const [v1, v2] = project.tracks
+    const mask = join(dir, 'mask.png')
+    run([
+      '-f',
+      'lavfi',
+      '-i',
+      "color=black@0:s=160x90,format=rgba,geq=r=255:g=255:b=255:a='if(lt(hypot(X-80,Y-45),40),255,0)'",
+      '-frames:v',
+      '1',
+      mask
+    ])
+    const ring = join(dir, 'ring.png')
+    run(['-f', 'lavfi', '-i', 'color=white@0.6:s=160x90,format=rgba', '-frames:v', '1', ring])
+    const shade = join(dir, 'shade.png')
+    run(['-f', 'lavfi', '-i', 'color=gray:s=160x90,format=rgba', '-frames:v', '1', shade])
+
+    const clip = project.clips.find((c) => c.trackId === v1.id && c.kind === 'video')!
+    clip.effects = EFFECTS.map((d, i) => ({
+      id: `e${i}`,
+      type: d.type,
+      enabled: true,
+      params: defaultEffectParams(d.type)
+    }))
+    clip.mask = { ...defaultMask('circle', 640, 360), feather: 12 }
+    clip.border = { width: 6, color: '#ffcc00' }
+    clip.shadow = { color: '#000000', opacity: 0.7, blur: 20, distance: 16, angle: 60 }
+    clip.transform = { ...clip.transform, rotation: 12 }
+    const logo = project.clips.find((c) => c.trackId === v2.id && c.kind === 'image')!
+    logo.effects = [
+      { id: 's', type: 'sharpen', enabled: true, params: defaultEffectParams('sharpen') },
+      {
+        id: 'k',
+        type: 'chromaKey',
+        enabled: true,
+        params: { ...defaultEffectParams('chromaKey'), color: '#ff0000' }
+      }
+    ]
+    logo.shadow = { color: '#202020', opacity: 0.5, blur: 8, distance: 6, angle: 90 }
+
+    const vignette = EFFECTS.findIndex((d) => d.type === 'vignette')
+    const result = render(
+      project,
+      settings('mp4-h264', 'mp4', { end: 2, outputPath: join(dir, 'effects.mp4') }),
+      {
+        [textId]: overlay,
+        [fxImageKey.mask(clip.id)]: { path: mask, width: 160, height: 90 },
+        [fxImageKey.border(clip.id)]: { path: ring, width: 160, height: 90 },
+        [fxImageKey.vignette(clip.id, `e${vignette}`)]: { path: shade, width: 160, height: 90 }
+      }
+    )
+    expect(parseFloat(result.format.duration)).toBeCloseTo(2, 0)
+    expect(result.streams.find((s) => s.codec_type === 'video')?.width).toBe(640)
+  }, 120_000)
+
+  it('cuts a layer to its mask', () => {
+    const project = createProject('Mask', { width: 320, height: 180, fps: 30, background: '#0000ff' })
+    const solid = createClip({
+      trackId: project.tracks[0].id,
+      kind: 'solid',
+      start: 0,
+      duration: 1,
+      solidColor: '#ff0000'
+    })
+    solid.mask = defaultMask('ellipse', 320, 180)
+    project.clips.push(solid)
+    const mask = join(dir, 'oval.png')
+    run([
+      '-f',
+      'lavfi',
+      '-i',
+      "color=black@0:s=320x180,format=rgba,geq=r=255:g=255:b=255:a='if(lt(hypot((X-160)/160,(Y-90)/90),1),255,0)'",
+      '-frames:v',
+      '1',
+      mask
+    ])
+    const out = join(dir, 'mask.mp4')
+    render(
+      project,
+      settings('mp4-h264', 'mp4', { end: 1, width: 320, height: 180, quality: 'high', outputPath: out }),
+      {
+        [fxImageKey.mask(solid.id)]: { path: mask, width: 320, height: 180 }
+      }
+    )
+    const frame = execFileSync(ffmpeg, [
+      '-v',
+      'error',
+      '-i',
+      out,
+      '-frames:v',
+      '1',
+      '-f',
+      'rawvideo',
+      '-pix_fmt',
+      'rgb24',
+      '-'
+    ])
+    const pixel = (x: number, y: number) => [...frame.subarray((y * 320 + x) * 3, (y * 320 + x) * 3 + 3)]
+    const [cr, , cb] = pixel(160, 90)
+    const [kr, , kb] = pixel(4, 4)
+    expect(cr).toBeGreaterThan(200)
+    expect(cb).toBeLessThan(60)
+    expect(kr).toBeLessThan(60)
+    expect(kb).toBeGreaterThan(200)
+  }, 60_000)
 
   it('renders an empty timeline as black with silence', () => {
     const project = createProject('Empty', { width: 320, height: 180 })

@@ -68,6 +68,17 @@ Whether a file needs a preview copy is decided in `lib/media.ts` from the contai
 
 `src/shared/ffmpeg-graph.integration.test.ts` renders a project with every kind of layer through the real FFmpeg in each output format.
 
+## Effects
+
+A clip can carry a `mask` (shape), a `border`, a `shadow` and a list of `effects`, all optional so older projects open unchanged. `src/shared/effects.ts` defines them, the effect registry (parameters, ranges and defaults, which the inspector and the assistant tool schema are built from) and the math the preview and the export must agree on: color matrices, pixelate blocks, RGB split offsets, shadow padding and the Camera Shake curve, which the export writes as an FFmpeg expression (a test evaluates both).
+
+Each layer goes through the same steps in both renderers: flip, crop and scale to its size in output pixels; color; effects in order; mask (alpha times the mask image); border (overlaid); shadow (the layer is padded, a blurred and offset copy of its alpha in the shadow color goes underneath); then rotation, opacity and fades.
+
+- **Images**: masks, borders and vignettes are drawn with the 2D canvas in `engine/decor.ts` at the layer's pixel size. The preview uploads them as textures; for the export the renderer draws them again at the export size (`exportLayerSize`) and sends them as PNG files with the text layers, keyed by `fxImageKey`.
+- **Preview** (`engine/fx.ts`, `engine/fx-gl.ts`): a clip with effects is drawn at its own size into a texture, each effect is a fragment shader pass between pooled textures, and the result is drawn at the layer's corners (padded for a shadow). Clips without effects keep the single draw call. The shaders follow the FFmpeg filters: Gaussian blur against `gblur` with `steps=4`, a 5x5 luma unsharp mask, block averages for pixelate, `chromakey`'s U/V distance with `despill`, `noise` strength measured at 0.65 per unit of standard deviation, and `overlay`'s straight alpha blending.
+- **Export** (`ClipChain` in `ffmpeg-graph.ts`): filters that keep transparency share one statement; others (`eq`, `unsharp`) run with the alpha split off and merged back. Masks and vignettes are `blend` in planar RGB with alpha (`c3_mode=multiply` for the mask), glow is a split, threshold `lutrgb`, `gblur` and a screen blend, and Camera Shake moves the final `overlay`.
+- **Canvas fallback**: shape, border, shadow, vignette and pixelate match; blur and the color effects use CSS filters; the rest are skipped.
+
 ## Assistant connector
 
 Assistants such as Claude edit through a fixed set of tools defined once in `src/shared/ai-tools.ts`. Each tool has a JSON Schema for its input and MCP hints such as `readOnlyHint`.

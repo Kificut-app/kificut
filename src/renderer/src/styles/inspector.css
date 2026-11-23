@@ -184,3 +184,49 @@
   margin: 0;
   font-variant-numeric: tabular-nums;
 }
+
+/* Shape, Border and Shadow, Effects */
+
+.shape-picker {
+  display: grid;
+  grid-template-columns: repeat(9, minmax(0, 1fr));
+  gap: 2px;
+  margin-bottom: 6px;
+}
+
+.shape-picker .icon-btn {
+  width: auto;
+}
+
+.fx-card {
+  margin: 0 0 8px;
+  padding: 4px 8px 6px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  background: var(--bg-panel-raised);
+}
+
+.fx-card.is-off > :not(.fx-card__head) {
+  opacity: 0.45;
+}
+
+.fx-card__head {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 28px;
+}
+
+.fx-card__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fx-add {
+  width: 100%;
+}

@@ -7,6 +7,13 @@ import {
   type Track
 } from '@shared/types'
 import {
+  normalizeBorder,
+  normalizeEffect,
+  normalizeMask,
+  normalizeShadow,
+  type Effect
+} from '@shared/effects'
+import {
   createTrack,
   defaultColor,
   defaultSettings,
@@ -31,6 +38,22 @@ function str(value: unknown, fallback: string): string {
 
 function bool(value: unknown, fallback: boolean): boolean {
   return typeof value === 'boolean' ? value : fallback
+}
+
+/** Effects, shape, border and shadow, only set when present so older projects stay unchanged. */
+function clipFx(c: Loose<Clip>): Pick<Clip, 'mask' | 'border' | 'shadow' | 'effects'> {
+  const out: Pick<Clip, 'mask' | 'border' | 'shadow' | 'effects'> = {}
+  const mask = normalizeMask(c.mask)
+  const border = normalizeBorder(c.border)
+  const shadow = normalizeShadow(c.shadow)
+  const effects = (Array.isArray(c.effects) ? c.effects : [])
+    .map((e) => normalizeEffect(e, () => uid('fx')))
+    .filter((e): e is Effect => e !== null)
+  if (mask) out.mask = mask
+  if (border) out.border = border
+  if (shadow) out.shadow = shadow
+  if (effects.length) out.effects = effects
+  return out
 }
 
 /**
@@ -98,7 +121,8 @@ export function parseProjectFile(data: unknown): Project {
       fadeIn: Math.max(0, num(c.fadeIn, 0)),
       fadeOut: Math.max(0, num(c.fadeOut, 0)),
       text: c.text ? defaultTextStyle(c.text as object) : null,
-      solidColor: typeof c.solidColor === 'string' ? c.solidColor : null
+      solidColor: typeof c.solidColor === 'string' ? c.solidColor : null,
+      ...clipFx(c)
     }))
     .filter((c) => trackIds.has(c.trackId))
 
