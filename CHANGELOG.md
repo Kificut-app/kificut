@@ -4,6 +4,10 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.5.0]
+
+Shapes, borders, shadows and effects for clips.
+
 ### Added
 
 - Shapes: cut any clip to a rectangle with rounded corners, an oval, a circle, a heart, a star, a triangle, a diamond or a hexagon, with size, position, rotation, roundness, feather and invert
